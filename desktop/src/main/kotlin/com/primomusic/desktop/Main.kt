@@ -2,11 +2,13 @@ package com.primomusic.desktop
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -18,6 +20,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -30,7 +33,6 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DarkMode
-import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Article
 import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.FullscreenExit
@@ -89,6 +91,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Path
@@ -105,6 +109,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowPlacement
+import androidx.compose.ui.window.DialogWindow
+import androidx.compose.ui.window.rememberDialogState
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import coil3.compose.AsyncImage
@@ -121,6 +127,10 @@ import com.primomusic.core.music.LyricsClient
 import com.primomusic.desktop.ui.LiquidGlassSurface
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.longOrNull
 import java.awt.Desktop
 import java.net.URI
 import kotlin.math.roundToInt
@@ -138,9 +148,9 @@ private data class Palette(
 )
 
 private val PurpleDark = Palette(
-    bg = Color(0xFF07080D), sidebar = Color(0xFF0B0D13), surface = Color(0xFF12151D),
-    surfaceAlt = Color(0xFF191D27), border = Color(0xFF303646), accent = Color(0xFF8B5CF6),
-    accent2 = Color(0xFF6D3EF2), text = Color(0xFFF7F7FB), muted = Color(0xFFA4A9B8),
+    bg = Color(0xFF08080C), sidebar = Color(0xFF101016), surface = Color(0xFF15141D),
+    surfaceAlt = Color(0xFF201A2B), border = Color(0xFF393046), accent = Color(0xFFAD68FF),
+    accent2 = Color(0xFF7636E9), text = Color(0xFFF9F6FF), muted = Color(0xFFAAA2B8),
 )
 
 private val MonochromeDark = Palette(
@@ -148,6 +158,9 @@ private val MonochromeDark = Palette(
     surfaceAlt = Color(0xFF191919), border = Color(0xFF323232), accent = Color(0xFFF2F2F2),
     accent2 = Color(0xFFB9B9B9), text = Color(0xFFF5F5F5), muted = Color(0xFFA0A0A0),
 )
+
+private fun Palette.onAccent(): Color =
+    if (accent.red > .8f && accent.green > .8f && accent.blue > .8f) Color(0xFF101010) else Color.White
 
 private fun glassPalette(base: Palette): Palette = base.copy(
     // Alpha is preserved by the surfaces below. Earlier builds accidentally
@@ -214,14 +227,14 @@ private fun Modifier.liquidGlassSurface(
 }
 
 private enum class Section(val label: String, val icon: ImageVector) {
-    HOME("Home", Icons.Filled.Home),
+    HOME("Ouvir agora", Icons.Filled.Home),
     EXPLORE("Explorar", Icons.Filled.MusicNote),
     SEARCH("Buscar", Icons.Filled.Search),
     LIBRARY("Biblioteca", Icons.Filled.LibraryMusic),
     PLAYLISTS("Playlists", Icons.Filled.QueueMusic),
     LIKED("Curtidas", Icons.Filled.Favorite),
     HISTORY("Histórico", Icons.Filled.Article),
-    DOWNLOADS("Downloads", Icons.Filled.Download),
+    TOGETHER("Ouvir juntos", Icons.Filled.LibraryMusic),
     SETTINGS("Configurações", Icons.Filled.Settings),
 }
 
@@ -251,7 +264,8 @@ fun main() {
             DesktopTheme.MONOCHROME -> MonochromeDark
             DesktopTheme.PURPLE -> PurpleDark
         }
-        val effectiveLiquidGlass = liquidGlass && !gamerMode
+        // The glass layer obscured artwork and text in the Windows player.
+        val effectiveLiquidGlass = false
         val p = if (effectiveLiquidGlass) glassPalette(basePalette) else basePalette
 
         LaunchedEffect(gamerMode) {
@@ -320,6 +334,7 @@ private fun KodaMusicApp(
     onFullscreen: (Boolean) -> Unit,
 ) {
     var section by remember { mutableStateOf(Section.HOME) }
+    var settingsOpen by remember { mutableStateOf(false) }
     var query by remember { mutableStateOf("") }
     var suggestions by remember { mutableStateOf<List<String>>(emptyList()) }
     var results by remember { mutableStateOf<List<YouTubeMusicSearchClient.Track>>(emptyList()) }
@@ -371,6 +386,44 @@ private fun KodaMusicApp(
     var lyricsVisible by remember { mutableStateOf(false) }
     val favorites = remember { mutableStateListOf<String>() }
     val scope = rememberCoroutineScope()
+    var partyRoom by remember { mutableStateOf(ListenTogetherDesktop.Room()) }
+    val party = remember { ListenTogetherDesktop(scope) { partyRoom = it } }
+    var partyServer by remember { mutableStateOf(party.savedServer) }
+    var partyCode by remember { mutableStateOf("") }
+    var partyBusy by remember { mutableStateOf(false) }
+    var partyError by remember { mutableStateOf<String?>(null) }
+
+    // The room's numbered playback frame is authoritative. The local player
+    // follows it, including when a device joins an already running song.
+    LaunchedEffect(partyRoom.playback, partyRoom.connected) {
+        if (!partyRoom.connected) return@LaunchedEffect
+        val playback = partyRoom.playback ?: return@LaunchedEffect
+        val remote = runCatching { playback["track"]?.jsonObject }.getOrNull() ?: return@LaunchedEffect
+        val videoId = remote["videoId"]?.jsonPrimitive?.contentOrNull ?: return@LaunchedEffect
+        val playing = playback["isPlaying"]?.jsonPrimitive?.contentOrNull == "true"
+        val anchor = playback["anchorMs"]?.jsonPrimitive?.longOrNull ?: System.currentTimeMillis()
+        val base = playback["positionMs"]?.jsonPrimitive?.longOrNull ?: 0L
+        val expected = base + if (playing) (System.currentTimeMillis() - anchor).coerceAtLeast(0L) else 0L
+        if (selected?.videoId != videoId) {
+            selected = YouTubeMusicSearchClient.Track(
+                videoId, remote["title"]?.jsonPrimitive?.contentOrNull ?: "Música",
+                remote["artist"]?.jsonPrimitive?.contentOrNull ?: "",
+                remote["thumbnailUrl"]?.jsonPrimitive?.contentOrNull, null,
+            )
+            if (playing) {
+                runCatching { player.play(videoId, playerState.volume, audioQuality, 0L) { playerState = it } }
+                if (expected > 0 && playerState.durationMillis > 0) player.seek((expected.toFloat() / playerState.durationMillis).coerceIn(0f, 1f)) { playerState = it }
+            }
+        } else {
+            if (playing && playerState.state != DesktopAudioPlayer.State.PLAYING) {
+                if (playerState.state == DesktopAudioPlayer.State.PAUSED) player.toggle { playerState = it }
+                else runCatching { player.play(videoId, playerState.volume, audioQuality, 0L) { playerState = it } }
+            } else if (!playing && playerState.state == DesktopAudioPlayer.State.PLAYING) player.toggle { playerState = it }
+            if (playerState.durationMillis > 0 && kotlin.math.abs(playerState.positionMillis - expected) > 1800L) {
+                player.seek((expected.toFloat() / playerState.durationMillis).coerceIn(0f, 1f)) { playerState = it }
+            }
+        }
+    }
 
     fun search(
         value: String = query,
@@ -399,6 +452,7 @@ private fun KodaMusicApp(
     }
 
     fun playTrack(track: YouTubeMusicSearchClient.Track, sourceQueue: List<YouTubeMusicSearchClient.Track> = emptyList()) {
+        party.control("setTrack", 0L, track)
         selected = track
         lyricsVisible = false
         val normalizedQueue = sourceQueue.distinctBy { it.videoId }
@@ -686,7 +740,7 @@ private fun KodaMusicApp(
                                 .offset(x = 70.dp, y = (-80).dp)
                                 .width(430.dp)
                                 .height(250.dp)
-                                .blur(115.dp)
+                                .blur(40.dp)
                                 .background(
                                     Brush.radialGradient(
                                         listOf(
@@ -713,7 +767,10 @@ private fun KodaMusicApp(
                         profile = accountProfile,
                         liquidGlass = liquidGlass,
                         glassBackdrop = panelBackdrop,
-                        onSection = { section = it },
+                        onSection = { destination ->
+                            if (destination == Section.SETTINGS) settingsOpen = true
+                            else section = destination
+                        },
                         onLogin = { loginOpen = true },
                     )
 
@@ -721,7 +778,7 @@ private fun KodaMusicApp(
                         modifier = Modifier
                             .weight(1f)
                             .fillMaxHeight()
-                            .padding(18.dp),
+                            .padding(start = 18.dp, top = 18.dp, end = 18.dp, bottom = 142.dp),
                         verticalArrangement = Arrangement.spacedBy(14.dp),
                     ) {
                         KodaTopBar(
@@ -915,8 +972,27 @@ private fun KodaMusicApp(
                                             onRefresh = ::refreshAccount,
                                         )
 
-                                    Section.DOWNLOADS ->
-                                        KodaDownloadsView(p)
+                                    Section.TOGETHER ->
+                                        ListenTogetherView(
+                                            p = p,
+                                            server = partyServer,
+                                            onServer = { partyServer = it },
+                                            code = partyCode,
+                                            onCode = { partyCode = it },
+                                            room = partyRoom,
+                                            busy = partyBusy,
+                                            error = partyError,
+                                            onEnter = { joinCode ->
+                                                partyBusy = true
+                                                partyError = null
+                                                scope.launch {
+                                                    party.enter(partyServer, joinCode, accountProfile?.name ?: if (accountConnected) "Koda" else "", accountProfile?.thumbnailUrl)
+                                                        .onFailure { partyError = it.message }
+                                                    partyBusy = false
+                                                }
+                                            },
+                                            onLeave = { party.leave() },
+                                        )
 
                                     Section.SETTINGS ->
                                         SettingsView(
@@ -953,7 +1029,7 @@ private fun KodaMusicApp(
                         .align(Alignment.BottomCenter)
                         .fillMaxWidth()
                         .padding(
-                            start = 208.dp,
+                            start = 242.dp,
                             end = 22.dp,
                             bottom = 22.dp,
                         ),
@@ -986,6 +1062,7 @@ private fun KodaMusicApp(
                                     playTrack(it, playbackQueue)
                                 }
                             } else {
+                                party.control(if (playerState.state == DesktopAudioPlayer.State.PLAYING) "pause" else "play", playerState.positionMillis)
                                 player.toggle {
                                     playerState = it
                                 }
@@ -997,6 +1074,7 @@ private fun KodaMusicApp(
                             }
                         },
                         onSeek = {
+                            party.control("seek", (playerState.durationMillis * it).toLong())
                             player.seek(it) { snap ->
                                 playerState = snap
                             }
@@ -1059,9 +1137,15 @@ private fun KodaMusicApp(
                     onToggle = {
                         if (playerState.state in setOf(DesktopAudioPlayer.State.STOPPED, DesktopAudioPlayer.State.ERROR, DesktopAudioPlayer.State.IDLE)) {
                             selected?.let { playTrack(it, playbackQueue) }
-                        } else player.toggle { playerState = it }
+                        } else {
+                            party.control(if (playerState.state == DesktopAudioPlayer.State.PLAYING) "pause" else "play", playerState.positionMillis)
+                            player.toggle { playerState = it }
+                        }
                     },
-                    onSeek = { player.seek(it) { snap -> playerState = snap } },
+                    onSeek = {
+                        party.control("seek", (playerState.durationMillis * it).toLong())
+                        player.seek(it) { snap -> playerState = snap }
+                    },
                     onVolume = { player.setVolume(it) { snap -> playerState = snap } },
                     onMute = { player.toggleMute { snap -> playerState = snap } },
                 )
@@ -1125,6 +1209,33 @@ private fun KodaMusicApp(
             )
         }
     }
+
+    if (settingsOpen) {
+        DialogWindow(
+            onCloseRequest = { settingsOpen = false },
+            title = "Koda Music · Configurações",
+            state = rememberDialogState(width = 980.dp, height = 680.dp),
+        ) {
+            MaterialTheme(colorScheme = darkColorScheme(primary = p.accent, background = p.bg, surface = p.surface)) {
+                Box(Modifier.fillMaxSize().background(p.bg).padding(14.dp)) {
+                    SettingsView(
+                        p = p,
+                        theme = theme,
+                        onTheme = onTheme,
+                        gamerMode = gamerMode,
+                        onGamerMode = onGamerMode,
+                        liquidGlass = liquidGlass,
+                        onLiquidGlass = onLiquidGlass,
+                        quality = audioQuality,
+                        onQuality = {
+                            audioQuality = it
+                            DesktopPreferences.setAudioQuality(it)
+                        },
+                    )
+                }
+            }
+        }
+    }
 }
 
 @Composable
@@ -1137,19 +1248,18 @@ private fun Sidebar(
     onSection: (Section) -> Unit,
     onLogin: () -> Unit,
 ) {
-    val sidebarShape = RoundedCornerShape(0.dp, 18.dp, 18.dp, 0.dp)
+    val sidebarShape = RoundedCornerShape(0.dp, 16.dp, 16.dp, 0.dp)
     Column(
-        Modifier.width(190.dp).fillMaxHeight()
-            .liquidGlassSurface(liquidGlass, glassBackdrop, sidebarShape, p.sidebar)
-            .then(if (liquidGlass) Modifier else Modifier.background(Brush.verticalGradient(listOf(p.sidebar, p.surface))))
-            .border(1.dp, p.border.copy(alpha = 0.70f), sidebarShape)
+        Modifier.width(224.dp).fillMaxHeight()
+            .background(p.sidebar)
+            .border(1.dp, p.border.copy(alpha = 0.36f), sidebarShape)
             .padding(14.dp),
     ) {
         Brand(p)
-        Spacer(Modifier.height(20.dp))
+        Spacer(Modifier.height(28.dp))
         Section.entries.filter { it != Section.SETTINGS }.forEach { item ->
             NavButton(p, item, section == item) { onSection(item) }
-            Spacer(Modifier.height(4.dp))
+            Spacer(Modifier.height(5.dp))
         }
         Spacer(Modifier.weight(1f))
         NavButton(p, Section.SETTINGS, section == Section.SETTINGS) { onSection(Section.SETTINGS) }
@@ -1172,13 +1282,13 @@ private fun Sidebar(
 @Composable
 private fun NavButton(p: Palette, item: Section, selected: Boolean, onClick: () -> Unit) {
     Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
-            .background(if (selected) p.accent.copy(alpha = 0.18f) else Color.Transparent)
-            .clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 10.dp),
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(11.dp))
+            .background(if (selected) p.accent.copy(alpha = 0.19f) else Color.Transparent)
+            .clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 11.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(11.dp),
     ) {
-        Icon(item.icon, item.label, tint = if (selected) p.accent else p.muted, modifier = Modifier.size(18.dp))
+        Icon(item.icon, item.label, tint = if (selected) p.accent else p.muted, modifier = Modifier.size(19.dp))
         Text(item.label, color = if (selected) p.text else p.muted, fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium, fontSize = 12.sp)
     }
 }
@@ -1188,7 +1298,7 @@ private fun Brand(p: Palette) {
     Image(
         painter = painterResource("branding/p-music-logo.png"),
         contentDescription = "Koda Music",
-        modifier = Modifier.width(150.dp).height(44.dp),
+        modifier = Modifier.width(194.dp).height(58.dp),
         contentScale = ContentScale.Fit,
     )
 }
@@ -1246,13 +1356,15 @@ private fun KodaTopBar(
                     shape = RoundedCornerShape(50),
                     border = BorderStroke(1.dp, p.accent.copy(alpha = .55f)),
                 ) {
-                    Text(
-                        "🎮  Modo Gamer",
-                        color = p.text,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 13.dp, vertical = 9.dp),
-                    )
+                    Row(
+                        modifier = Modifier.padding(horizontal = 11.dp, vertical = 7.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(7.dp),
+                    ) {
+                        Image(painterResource("branding/p-music-icon.png"), null, Modifier.size(18.dp))
+                        Text("Modo Gamer", color = p.text, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Box(Modifier.size(6.dp).background(Color(0xFF67DE9B), CircleShape))
+                    }
                 }
             }
 
@@ -1326,13 +1438,14 @@ private fun KodaHomeView(
         ?: discoveryShelves.firstOrNull()?.items?.firstOrNull()?.thumbnailUrl
 
     LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+        modifier = Modifier.fillMaxSize().padding(horizontal = 6.dp),
+        verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
         item {
+            Row(horizontalArrangement = Arrangement.spacedBy(14.dp), modifier = Modifier.fillMaxWidth()) {
             Card(
-                modifier = Modifier.fillMaxWidth().height(184.dp),
-                shape = RoundedCornerShape(22.dp),
+                modifier = Modifier.weight(1f).height(236.dp),
+                shape = RoundedCornerShape(18.dp),
                 colors = CardDefaults.cardColors(containerColor = Color(0xFF090A0F)),
                 border = BorderStroke(1.dp, p.border.copy(alpha = .55f)),
             ) {
@@ -1355,10 +1468,17 @@ private fun KodaHomeView(
                                     listOf(
                                         Color(0xFF07080C).copy(alpha = .99f),
                                         Color(0xFF090A10).copy(alpha = .82f),
-                                        p.accent2.copy(alpha = .18f),
+                        p.accent2.copy(alpha = .25f),
                                     ),
                                 ),
                             ),
+                    )
+
+                    Image(
+                        painter = painterResource("branding/p-music-logo.png"),
+                        contentDescription = "Identidade oficial Koda Music",
+                        modifier = Modifier.align(Alignment.TopEnd).padding(18.dp).width(235.dp).height(56.dp),
+                        contentScale = ContentScale.Fit,
                     )
 
                     Column(
@@ -1384,7 +1504,7 @@ private fun KodaHomeView(
                                 shape = RoundedCornerShape(13.dp),
                                 colors = ButtonDefaults.buttonColors(containerColor = p.accent),
                             ) {
-                                Icon(Icons.Filled.PlayArrow, null, tint = Color.White)
+                                Icon(Icons.Filled.PlayArrow, null, tint = p.onAccent())
                                 Spacer(Modifier.width(6.dp))
                                 Text(
                                     if (heroTrack != null) "Reproduzir mix" else "Buscar música",
@@ -1402,22 +1522,47 @@ private fun KodaHomeView(
                         }
                     }
 
-                    if (connected) {
-                        OutlinedButton(
-                            onClick = onRefresh,
-                            enabled = !loading,
-                            modifier = Modifier.align(Alignment.TopEnd).padding(14.dp),
-                            shape = RoundedCornerShape(12.dp),
-                            border = BorderStroke(1.dp, Color.White.copy(alpha = .14f)),
-                        ) {
-                            Text(
-                                if (loading) "Sincronizando…" else "Atualizar",
-                                color = Color.White,
-                                fontSize = 10.sp,
-                            )
+                }
+            }
+            Card(
+                modifier = Modifier.width(282.dp).height(236.dp),
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF101016)),
+                border = BorderStroke(1.dp, p.border.copy(alpha = .65f)),
+            ) {
+                Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("Continue de onde parou", color = p.text, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        if (connected) Text("●", color = p.accent, fontSize = 11.sp)
+                    }
+                    if (history.isEmpty()) {
+                        Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                            Text("Suas músicas recentes aparecerão aqui.", color = p.muted, fontSize = 11.sp)
+                        }
+                    } else {
+                        history.take(3).forEach { track ->
+                            Row(
+                                Modifier.fillMaxWidth().weight(1f)
+                                    .clip(RoundedCornerShape(10.dp)).clickable { onPlay(track) }.padding(4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Cover(track.thumbnailUrl, track.title, p, 46.dp)
+                                Spacer(Modifier.width(9.dp))
+                                Column(Modifier.weight(1f)) {
+                                    Text(track.title, color = p.text, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    Text(track.artist, color = p.muted, fontSize = 9.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                }
+                                Icon(Icons.Filled.PlayArrow, "Reproduzir", tint = p.accent, modifier = Modifier.size(20.dp))
+                            }
                         }
                     }
+                    if (connected) Text(
+                        if (loading) "Sincronizando…" else "Atualizar biblioteca",
+                        modifier = Modifier.clickable(enabled = !loading, onClick = onRefresh).padding(top = 2.dp),
+                        color = p.muted, fontSize = 10.sp,
+                    )
                 }
+            }
             }
         }
 
@@ -1535,30 +1680,26 @@ private fun KodaExploreView(
             }
 
             else -> sections.forEach { section ->
-                item(key = "explore-${section.title}") {
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Text(
-                            section.title,
-                            color = p.text,
-                            fontSize = 17.sp,
-                            fontWeight = FontWeight.Bold,
-                        )
-                        section.items.chunked(3).forEach { row ->
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                            ) {
-                                row.forEach { mood ->
-                                    KodaMoodCard(
-                                        p = p,
-                                        mood = mood,
-                                        modifier = Modifier.weight(1f),
-                                        onClick = { onOpen(mood) },
-                                    )
-                                }
-                                repeat(3 - row.size) {
-                                    Spacer(Modifier.weight(1f))
-                                }
+                item(key = "explore-title-${section.title}") {
+                    Text(section.title, color = p.text, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+                }
+                section.items.chunked(3).forEachIndexed { rowIndex, row ->
+                    item(key = "explore-${section.title}-$rowIndex") {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            row.forEach { mood ->
+                                KodaMoodCard(
+                                    p = p,
+                                    mood = mood,
+                                    genre = section.title.contains("gênero", ignoreCase = true),
+                                    modifier = Modifier.weight(1f),
+                                    onClick = { onOpen(mood) },
+                                )
+                            }
+                            repeat(3 - row.size) {
+                                Spacer(Modifier.weight(1f))
                             }
                         }
                     }
@@ -1574,44 +1715,39 @@ private fun KodaExploreView(
 private fun KodaMoodCard(
     p: Palette,
     mood: YouTubeMusicSearchClient.MoodGenre,
+    genre: Boolean = false,
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
-    val seed = (mood.title.hashCode() and Int.MAX_VALUE) % 5
-    val secondary = when (seed) {
-        0 -> p.accent
-        1 -> p.accent2
-        2 -> Color(0xFF3751B7)
-        3 -> Color(0xFF7B2F8F)
-        else -> Color(0xFF333947)
+    val title = mood.title.lowercase()
+    val illustration = when {
+        listOf("sono", "noite", "relax", "calma").any(title::contains) -> Icons.Filled.DarkMode
+        listOf("amor", "romance", "coração").any(title::contains) -> Icons.Filled.Favorite
+        listOf("game", "energia", "treino", "foco").any(title::contains) -> Icons.Filled.Speed
+        listOf("sol", "alegre", "verão", "dia").any(title::contains) -> Icons.Filled.LightMode
+        else -> Icons.Filled.MusicNote
+    }
+    val artwork = when (illustration) {
+        Icons.Filled.DarkMode -> "illustrations/night.jpg"
+        Icons.Filled.Favorite -> "illustrations/heart.jpg"
+        Icons.Filled.Speed -> "illustrations/energy.jpg"
+        Icons.Filled.LightMode -> "illustrations/sun.jpg"
+        else -> "illustrations/music.jpg"
     }
 
     Card(
-        modifier = modifier.height(88.dp).clickable(onClick = onClick),
+        modifier = modifier.height(116.dp).clickable(onClick = onClick),
         shape = RoundedCornerShape(15.dp),
         colors = CardDefaults.cardColors(containerColor = p.surface),
         border = BorderStroke(1.dp, p.border.copy(alpha = .42f)),
     ) {
-        Box(
-            Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.horizontalGradient(
-                        listOf(
-                            Color(0xFF101118),
-                            secondary.copy(alpha = .72f),
-                        ),
-                    ),
-                ),
-        ) {
-            Box(
-                Modifier
-                    .align(Alignment.BottomEnd)
-                    .size(62.dp)
-                    .offset(x = 12.dp, y = 14.dp)
-                    .clip(RoundedCornerShape(13.dp))
-                    .background(Color.White.copy(alpha = .10f)),
-            )
+        Box(Modifier.fillMaxSize()) {
+            if (genre) {
+                KodaGenreArtwork(mood.title)
+            } else {
+                Image(painterResource(artwork), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+            }
+            Box(Modifier.fillMaxSize().background(Brush.horizontalGradient(listOf(Color(0xE8090911), Color(0x93090911), Color.Transparent))))
             Text(
                 mood.title,
                 color = Color.White,
@@ -1619,9 +1755,49 @@ private fun KodaMoodCard(
                 fontWeight = FontWeight.Black,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.align(Alignment.TopStart).padding(14.dp).fillMaxWidth(.72f),
+                modifier = Modifier.align(Alignment.TopStart).padding(15.dp).fillMaxWidth(.66f),
             )
         }
+    }
+}
+
+/** Lightweight, deterministic artwork: every genre gets its own palette and waveform. */
+@Composable
+private fun KodaGenreArtwork(title: String) {
+    val seed = title.fold(0L) { value, char -> (value * 31 + char.code) and 0x7FFFFFFF }
+    val colors = listOf(
+        Color(0xFF844AF1), Color(0xFFEF697D), Color(0xFF4FC7D6),
+        Color(0xFFF3A14C), Color(0xFF78BD8B), Color(0xFF627ADF),
+        Color(0xFFD77AC7), Color(0xFFDBB65B), Color(0xFF5CACB1),
+    )
+    val primary = colors[(seed % colors.size).toInt()]
+    val secondary = colors[((seed / 7 + 3) % colors.size).toInt()]
+    Canvas(Modifier.fillMaxSize()) {
+        drawRect(brush = Brush.linearGradient(listOf(Color(0xFF14131E), primary.copy(alpha = .68f), secondary.copy(alpha = .85f))))
+        val unit = size.minDimension
+        val center = Offset(size.width * (.72f + (seed % 5) * .035f), size.height * .67f)
+        for (ring in 0..3) {
+            drawCircle(
+                color = Color.White.copy(alpha = .09f + ring * .03f),
+                radius = unit * (.25f + ring * .18f),
+                center = center,
+                style = Stroke(width = 1.5f + ring),
+            )
+        }
+        val bars = 12 + (seed % 9).toInt()
+        for (index in 0 until bars) {
+            val x = size.width * (.32f + index.toFloat() / bars * .68f)
+            val variation = ((seed / (index + 1) + index * 17) % 71).toFloat() / 100f
+            val half = size.height * (.10f + variation * .26f)
+            drawLine(
+                color = Color.White.copy(alpha = .18f + variation * .24f),
+                start = Offset(x, size.height * .58f - half),
+                end = Offset(x, size.height * .58f + half),
+                strokeWidth = unit * .035f,
+                cap = androidx.compose.ui.graphics.StrokeCap.Round,
+            )
+        }
+        drawCircle(primary.copy(alpha = .25f), unit * .45f, Offset(size.width * .95f, 0f))
     }
 }
 
@@ -1980,30 +2156,12 @@ private fun KodaLibraryHubView(
         }
 
         item {
-            Text("No dispositivo", color = p.text, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+            Text("Em breve", color = p.text, fontSize = 17.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(8.dp))
             Row(
                 Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                KodaLibraryTile(
-                    p = p,
-                    title = "Downloads",
-                    subtitle = "Offline no Windows",
-                    icon = Icons.Filled.Download,
-                    modifier = Modifier.weight(1f),
-                    status = "EM DESENVOLVIMENTO",
-                    onClick = { onNavigate(Section.DOWNLOADS) },
-                )
-                KodaLibraryTile(
-                    p = p,
-                    title = "Música local",
-                    subtitle = "MP3, FLAC e mais",
-                    icon = Icons.Filled.LibraryMusic,
-                    modifier = Modifier.weight(1f),
-                    status = "PLANEJADO",
-                    onClick = null,
-                )
                 KodaLibraryTile(
                     p = p,
                     title = "Replay",
@@ -2131,49 +2289,35 @@ private fun KodaTrackCollectionView(
 }
 
 @Composable
-private fun KodaDownloadsView(
+private fun ListenTogetherView(
     p: Palette,
+    server: String,
+    onServer: (String) -> Unit,
+    code: String,
+    onCode: (String) -> Unit,
+    room: ListenTogetherDesktop.Room,
+    busy: Boolean,
+    error: String?,
+    onEnter: (String?) -> Unit,
+    onLeave: () -> Unit,
 ) {
-    Column(
-        modifier = Modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
-    ) {
-        Text("Downloads", color = p.text, fontSize = 26.sp, fontWeight = FontWeight.Black)
-        Text(
-            "A estrutura visual já faz parte do Koda 3.11. O mecanismo offline será integrado sem misturar arquivos temporários do streaming com downloads do usuário.",
-            color = p.muted,
-            fontSize = 11.sp,
-        )
-        Card(
-            modifier = Modifier.fillMaxWidth().height(150.dp),
-            shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = p.surface),
-            border = BorderStroke(1.dp, p.border.copy(alpha = .42f)),
-        ) {
-            Row(
-                Modifier.fillMaxSize().padding(18.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Surface(
-                    modifier = Modifier.size(62.dp),
-                    color = p.accent.copy(alpha = .13f),
-                    shape = RoundedCornerShape(18.dp),
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(Icons.Filled.Download, null, tint = p.accent, modifier = Modifier.size(30.dp))
-                    }
-                }
-                Spacer(Modifier.width(16.dp))
-                Column {
-                    Text("Offline com controle real", color = p.text, fontSize = 17.sp, fontWeight = FontWeight.Bold)
-                    Text(
-                        "Próxima etapa: pasta de downloads, progresso, remoção e reprodução local.",
-                        color = p.muted,
-                        fontSize = 10.sp,
-                    )
-                }
-            }
+    Column(Modifier.fillMaxSize().padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Text("Ouvir juntos", color = p.text, fontSize = 26.sp, fontWeight = FontWeight.Bold)
+        Text("Compartilhe um código e controle a reprodução com outras pessoas.", color = p.muted)
+        if (room.code.isNotBlank()) {
+            Text("Código da sala: ${room.code}", color = p.accent, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+            Text(if (room.connected) "Conectado" else "Reconecte à sala", color = p.muted)
+            room.members.forEach { Text(it, color = p.text) }
+            room.error?.let { Text(it, color = Color(0xFFFF8080)) }
+            OutlinedButton(onClick = onLeave) { Text("Sair da sala") }
+        } else {
+            TextField(value = server, onValueChange = onServer, label = { Text("Endereço do servidor de salas") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+            Text("Use o endereço HTTPS do servidor Ouvir Juntos do Koda.", color = p.muted, fontSize = 11.sp)
+            Button(onClick = { onEnter(null) }, enabled = !busy && server.isNotBlank()) { Text("Criar sala") }
+            TextField(value = code, onValueChange = { onCode(it.take(6).uppercase()) }, label = { Text("Código de seis caracteres") }, singleLine = true)
+            OutlinedButton(onClick = { onEnter(code) }, enabled = !busy && code.length == 6 && server.isNotBlank()) { Text("Entrar na sala") }
         }
+        error?.let { Text(it, color = Color(0xFFFF8080)) }
     }
 }
 
@@ -2593,10 +2737,11 @@ private fun MiniPlayer(
             .takeIf { it > 0L }
             ?: durationTextToMillis(track?.durationText)
 
+    // Solid controls keep the artwork, title and timeline legible.
     LiquidGlassSurface(
-        enabled = liquidGlass,
+        enabled = false,
         backdrop = glassBackdrop,
-        modifier = Modifier.fillMaxWidth().height(86.dp),
+        modifier = Modifier.fillMaxWidth().height(112.dp),
         shape = playerShape,
         solidColor = Color(0xFF0B0C11),
         tint = p.surface,
@@ -2610,7 +2755,7 @@ private fun MiniPlayer(
             verticalArrangement = Arrangement.SpaceBetween,
         ) {
             Row(
-                Modifier.fillMaxWidth().weight(1f),
+                Modifier.fillMaxWidth().height(58.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Row(
@@ -2670,12 +2815,12 @@ private fun MiniPlayer(
                         contentAlignment = Alignment.Center,
                     ) {
                         if (state.state == DesktopAudioPlayer.State.RESOLVING) {
-                            CircularProgressIndicator(Modifier.size(18.dp), color = Color.White, strokeWidth = 2.dp)
+                            CircularProgressIndicator(Modifier.size(18.dp), color = p.onAccent(), strokeWidth = 2.dp)
                         } else {
                             Icon(
                                 if (state.state == DesktopAudioPlayer.State.PLAYING) Icons.Filled.Pause else Icons.Filled.PlayArrow,
                                 null,
-                                tint = Color.White,
+                                tint = p.onAccent(),
                                 modifier = Modifier.size(24.dp),
                             )
                         }
@@ -2794,9 +2939,9 @@ private fun FullPlayerScreen(
                     contentDescription = null,
                     modifier = Modifier
                         .fillMaxSize()
-                        .blur(86.dp),
+                        .blur(28.dp),
                     contentScale = ContentScale.Crop,
-                    alpha = .48f,
+                    alpha = .52f,
                 )
             }
 
@@ -2806,9 +2951,9 @@ private fun FullPlayerScreen(
                     .background(
                         Brush.horizontalGradient(
                             listOf(
-                                Color.Black.copy(alpha = .88f),
-                                Color.Black.copy(alpha = .47f),
-                                Color.Black.copy(alpha = .68f),
+                                Color.Black.copy(alpha = .62f),
+                                Color.Black.copy(alpha = .38f),
+                                Color.Black.copy(alpha = .67f),
                             ),
                         ),
                     ),
@@ -2820,9 +2965,9 @@ private fun FullPlayerScreen(
                     .background(
                         Brush.verticalGradient(
                             listOf(
-                                Color.Black.copy(alpha = .18f),
-                                Color.Transparent,
-                                Color.Black.copy(alpha = .88f),
+                                Color.Black.copy(alpha = .22f),
+                                Color.Black.copy(alpha = .08f),
+                                Color.Black.copy(alpha = .75f),
                             ),
                         ),
                     ),
@@ -2879,8 +3024,8 @@ private fun FullPlayerScreen(
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 Icon(
-                                    Icons.Filled.FullscreenExit,
-                                    "Sair da tela cheia",
+                                Icons.Filled.FullscreenExit,
+                                    "Fechar janela do player",
                                     tint = Color.White,
                                     modifier = Modifier.size(20.dp),
                                 )
@@ -2889,22 +3034,25 @@ private fun FullPlayerScreen(
                     }
                 }
 
-                Row(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
+                BoxWithConstraints(
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                    contentAlignment = Alignment.Center,
                 ) {
-                    Column(
-                        modifier = Modifier.width(350.dp),
-                        verticalArrangement = Arrangement.Center,
+                    val coverSize = minOf(maxHeight * .72f, maxWidth * .34f, 410.dp)
+                    Row(
+                        modifier = Modifier
+                            .widthIn(max = 1120.dp)
+                            .fillMaxWidth()
+                            .fillMaxHeight()
+                            .padding(vertical = 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(48.dp),
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Card(
-                            modifier = Modifier.size(272.dp),
+                            modifier = Modifier.size(coverSize),
                             shape = RoundedCornerShape(18.dp),
                             colors = CardDefaults.cardColors(containerColor = Color(0xFF111116)),
-                            border = BorderStroke(1.dp, Color.White.copy(alpha = .13f)),
+                            border = BorderStroke(1.dp, Color.White.copy(alpha = .18f)),
                         ) {
                             if (!artwork.isNullOrBlank()) {
                                 AsyncImage(
@@ -2915,187 +3063,97 @@ private fun FullPlayerScreen(
                                 )
                             } else {
                                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                    Icon(
-                                        Icons.Filled.MusicNote,
-                                        null,
-                                        tint = p.accent,
-                                        modifier = Modifier.size(58.dp),
-                                    )
+                                    Icon(Icons.Filled.MusicNote, null, tint = p.accent, modifier = Modifier.size(64.dp))
                                 }
                             }
                         }
 
-                        Spacer(Modifier.height(18.dp))
-
-                        Text(
-                            track.title,
-                            color = Color.White,
-                            fontSize = 29.sp,
-                            fontWeight = FontWeight.Black,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-
-                        Spacer(Modifier.height(5.dp))
-
-                        Text(
-                            track.artist,
-                            color = Color.White.copy(alpha = .66f),
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.Medium,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-
-                        Spacer(Modifier.height(10.dp))
-
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(7.dp),
-                            verticalAlignment = Alignment.CenterVertically,
+                        Column(
+                            modifier = Modifier.weight(1f).fillMaxHeight(),
+                            verticalArrangement = Arrangement.Center,
                         ) {
-                            Surface(
-                                modifier = Modifier
-                                    .size(38.dp)
-                                    .clip(CircleShape)
-                                    .clickable(onClick = onFavorite),
-                                color = Color.Black.copy(alpha = .32f),
-                                shape = CircleShape,
-                                border = BorderStroke(1.dp, Color.White.copy(alpha = .14f)),
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.Top,
+                                horizontalArrangement = Arrangement.SpaceBetween,
                             ) {
-                                Box(contentAlignment = Alignment.Center) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        track.title,
+                                        color = Color.White,
+                                        fontSize = 30.sp,
+                                        fontWeight = FontWeight.Black,
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                    Spacer(Modifier.height(5.dp))
+                                    Text(
+                                        track.artist,
+                                        color = Color.White.copy(alpha = .70f),
+                                        fontSize = 16.sp,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                }
+                                IconButton(onClick = onFavorite) {
                                     Icon(
                                         if (favorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
                                         "Favorito",
                                         tint = if (favorite) p.accent else Color.White,
-                                        modifier = Modifier.size(19.dp),
                                     )
                                 }
                             }
-
-                            state.streamInfo
-                                ?.takeIf { it.isNotBlank() }
-                                ?.let { info ->
-                                    Surface(
-                                        color = Color.Black.copy(alpha = .28f),
-                                        shape = RoundedCornerShape(50),
-                                        border = BorderStroke(1.dp, Color.White.copy(alpha = .10f)),
-                                    ) {
-                                        Text(
-                                            info,
-                                            color = Color.White.copy(alpha = .58f),
-                                            fontSize = 9.sp,
-                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                                        )
-                                    }
-                                }
-                        }
-                    }
-
-                    if (lyricsVisible) {
-                        Card(
-                            modifier = Modifier
-                                .width(410.dp)
-                                .fillMaxHeight(.78f),
-                            shape = RoundedCornerShape(20.dp),
-                            colors = CardDefaults.cardColors(
-                                containerColor = Color(0xFF08090D).copy(alpha = .74f),
-                            ),
-                            border = BorderStroke(1.dp, Color.White.copy(alpha = .14f)),
-                        ) {
-                            Column(
-                                Modifier
-                                    .fillMaxSize()
-                                    .padding(20.dp),
-                                verticalArrangement = Arrangement.spacedBy(10.dp),
-                            ) {
-                                Row(
-                                    Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically,
+                            Spacer(Modifier.height(20.dp))
+                            if (lyricsVisible) {
+                                Surface(
+                                    modifier = Modifier.fillMaxWidth().fillMaxHeight(.72f),
+                                    color = Color(0xFF09090D).copy(alpha = .52f),
+                                    shape = RoundedCornerShape(16.dp),
+                                    border = BorderStroke(1.dp, Color.White.copy(alpha = .10f)),
                                 ) {
-                                    Text(
-                                        "Letras",
-                                        color = Color.White,
-                                        fontSize = 20.sp,
-                                        fontWeight = FontWeight.Black,
-                                    )
-                                    lyrics?.source?.let { source ->
-                                        Text(
-                                            source,
-                                            color = p.accent,
-                                            fontSize = 9.sp,
-                                            fontWeight = FontWeight.Bold,
-                                        )
-                                    }
-                                }
-
-                                when {
-                                    lyricsLoading -> {
-                                        Box(
-                                            Modifier.fillMaxSize(),
-                                            contentAlignment = Alignment.Center,
+                                    Column(
+                                        modifier = Modifier.fillMaxSize().padding(20.dp),
+                                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
                                         ) {
-                                            CircularProgressIndicator(color = p.accent)
+                                            Text("Letras", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                                            lyrics?.source?.let {
+                                                Text(it, color = Color.White.copy(alpha = .55f), fontSize = 10.sp)
+                                            }
                                         }
-                                    }
-
-                                    lyricsError != null -> {
-                                        Box(
-                                            Modifier.fillMaxSize(),
-                                            contentAlignment = Alignment.Center,
-                                        ) {
-                                            Text(
-                                                lyricsError ?: "",
-                                                color = Color.White.copy(alpha = .58f),
-                                                fontSize = 12.sp,
+                                        when {
+                                            lyricsLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                                CircularProgressIndicator(color = p.accent)
+                                            }
+                                            lyricsError != null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                                Text(lyricsError ?: "", color = Color.White.copy(alpha = .65f))
+                                            }
+                                            lyrics != null -> LyricsBody(
+                                                p = p.copy(text = Color.White, muted = Color.White.copy(alpha = .62f)),
+                                                lyrics = lyrics!!,
+                                                positionMillis = state.positionMillis,
                                             )
-                                        }
-                                    }
-
-                                    lyrics != null -> {
-                                        LyricsBody(
-                                            p = p.copy(
-                                                text = Color.White,
-                                                muted = Color.White.copy(alpha = .50f),
-                                            ),
-                                            lyrics = lyrics!!,
-                                            positionMillis = state.positionMillis,
-                                        )
-                                    }
-
-                                    else -> {
-                                        Box(
-                                            Modifier.fillMaxSize(),
-                                            contentAlignment = Alignment.Center,
-                                        ) {
-                                            Text(
-                                                "As letras aparecerão aqui.",
-                                                color = Color.White.copy(alpha = .52f),
-                                                fontSize = 12.sp,
-                                            )
+                                            else -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                                Text("As letras aparecerão aqui.", color = Color.White.copy(alpha = .60f))
+                                            }
                                         }
                                     }
                                 }
-                            }
-                        }
-                    } else {
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .fillMaxHeight(),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            if (!artwork.isNullOrBlank()) {
-                                AsyncImage(
-                                    model = artwork,
-                                    contentDescription = null,
-                                    modifier = Modifier
-                                        .fillMaxHeight(.78f)
-                                        .fillMaxWidth(.68f)
-                                        .clip(RoundedCornerShape(26.dp)),
-                                    contentScale = ContentScale.Crop,
-                                    alpha = .26f,
+                            } else {
+                                Text(
+                                    "Sua música ocupa o centro da cena.",
+                                    color = Color.White.copy(alpha = .70f),
+                                    fontSize = 18.sp,
                                 )
+                                Spacer(Modifier.height(14.dp))
+                                OutlinedButton(onClick = onLyricsToggle, border = BorderStroke(1.dp, Color.White.copy(alpha = .36f))) {
+                                    Icon(Icons.Filled.Article, null, tint = Color.White, modifier = Modifier.size(16.dp))
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("Mostrar letras", color = Color.White)
+                                }
                             }
                         }
                     }
@@ -3308,35 +3366,20 @@ private fun KodaPlaylistCard(
     onClick: () -> Unit,
 ) {
     Card(
-        modifier = Modifier.width(174.dp).height(82.dp).clickable(onClick = onClick),
+        modifier = Modifier.width(148.dp).height(108.dp).clickable(onClick = onClick),
         shape = RoundedCornerShape(13.dp),
         colors = CardDefaults.cardColors(containerColor = p.surfaceAlt),
         border = BorderStroke(1.dp, p.border.copy(alpha = .45f)),
     ) {
-        Row(
-            Modifier.fillMaxSize().padding(10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Cover(playlist.thumbnailUrl, playlist.title, p, 54.dp)
-            Spacer(Modifier.width(10.dp))
-            Column(Modifier.weight(1f)) {
-                Text(
-                    playlist.title,
-                    color = p.text,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                playlist.subtitle?.let {
-                    Text(
-                        it,
-                        color = p.muted,
-                        fontSize = 9.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
+        Box(Modifier.fillMaxSize().background(Brush.linearGradient(listOf(p.accent.copy(alpha = .38f), p.surfaceAlt, p.accent2.copy(alpha = .28f))))) {
+            playlist.thumbnailUrl?.takeIf { it.isNotBlank() }?.let { art ->
+                AsyncImage(model = art, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop, alpha = .34f)
+            }
+            Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = .88f)))))
+            Icon(Icons.Filled.LibraryMusic, null, tint = p.accent, modifier = Modifier.align(Alignment.TopStart).padding(12.dp).size(27.dp))
+            Column(Modifier.align(Alignment.BottomStart).padding(10.dp)) {
+                Text(playlist.title, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                playlist.subtitle?.let { Text(it, color = Color.White.copy(alpha = .65f), fontSize = 9.sp, maxLines = 1, overflow = TextOverflow.Ellipsis) }
             }
         }
     }
@@ -3497,7 +3540,7 @@ private fun NewPlaylistDialog(
                 Button(onClick = onCreate, modifier = Modifier.fillMaxWidth().height(46.dp), shape = RoundedCornerShape(14.dp), colors = ButtonDefaults.buttonColors(containerColor = p.accent)) {
                     Text("Criar playlist", fontWeight = FontWeight.Bold)
                 }
-                Text("A playlist é criada na conta Google/YouTube Music conectada, como no BitChord.", color = p.muted, fontSize = 11.sp)
+                Text("A playlist será criada na sua conta Google/YouTube Music conectada.", color = p.muted, fontSize = 11.sp)
             }
         }
     }
@@ -3537,7 +3580,7 @@ private fun SettingsView(
         Row(Modifier.fillMaxSize()) {
             Column(
                 modifier = Modifier
-                    .width(164.dp)
+                    .width(204.dp)
                     .fillMaxHeight()
                     .background(Color(0xFF0C0D12))
                     .padding(12.dp),
@@ -3588,18 +3631,22 @@ private fun SettingsView(
                 when (panel) {
                     SettingsPanel.GENERAL -> {
                         item {
-                            KodaSettingsInfoCard(
-                                p = p,
-                                title = "Koda Music 3.11.0",
-                                text = "Nova interface desktop, descoberta, biblioteca e player reorganizados sobre o mecanismo de reprodução já existente.",
-                            )
+                            Text("Tema", color = p.text, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                            Spacer(Modifier.height(8.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                KodaThemeCard(p, "Preto & Branco", theme == DesktopTheme.MONOCHROME) { onTheme(DesktopTheme.MONOCHROME) }
+                                KodaThemeCard(p, "Preto & Roxo", theme == DesktopTheme.PURPLE) { onTheme(DesktopTheme.PURPLE) }
+                            }
                         }
                         item {
-                            KodaSettingsInfoCard(
-                                p = p,
-                                title = "Conta e biblioteca",
-                                text = "A conta do YouTube Music alimenta histórico, curtidas, playlists e recomendações sem misturar essa lógica com a interface.",
-                            )
+                            Text("Efeitos e interface", color = p.text, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                            Spacer(Modifier.height(8.dp))
+                            KodaSettingToggle(p, "Modo Gamer", "Reduz efeitos visuais sem alterar a qualidade de áudio.", gamerMode, true, onGamerMode)
+                        }
+                        item {
+                            Text("Áudio", color = p.text, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                            Spacer(Modifier.height(8.dp))
+                            KodaSettingsInfoCard(p, "Qualidade de áudio", "${quality.label} · altere na seção Áudio.")
                         }
                     }
 
@@ -3621,20 +3668,6 @@ private fun SettingsView(
                                     onClick = { onTheme(DesktopTheme.PURPLE) },
                                 )
                             }
-                        }
-                        item {
-                            KodaSettingToggle(
-                                p = p,
-                                title = "Liquid Glass",
-                                subtitle = if (gamerMode) {
-                                    "Desativado temporariamente pelo Modo Gamer."
-                                } else {
-                                    "Refração e transparência sutis. Desligado por padrão para priorizar desempenho."
-                                },
-                                checked = liquidGlass && !gamerMode,
-                                enabled = !gamerMode,
-                                onChange = onLiquidGlass,
-                            )
                         }
                     }
 
@@ -3705,7 +3738,7 @@ private fun SettingsView(
                             KodaSettingsInfoCard(
                                 p = p,
                                 title = "Bonito sem pesar",
-                                text = "Listas são carregadas de forma lazy, o Liquid Glass é opcional e a interface evita animações permanentes. O objetivo é parecer premium sem competir com o jogo por recursos.",
+                                text = "Listas são carregadas conforme necessário e a interface evita efeitos permanentes que competem com o jogo por recursos.",
                             )
                         }
                     }
@@ -3845,7 +3878,7 @@ private fun KodaThemeCard(
                     .background(
                         Brush.horizontalGradient(
                             if (label.contains("Roxo")) {
-                                listOf(Color(0xFF090A0F), p.accent2.copy(alpha = .72f))
+                                listOf(Color(0xFF160A25), Color(0xFF843DEE), Color(0xFFB958F6))
                             } else {
                                 listOf(Color(0xFF070707), Color(0xFF494949))
                             },

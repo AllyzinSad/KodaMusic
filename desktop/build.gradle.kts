@@ -1,5 +1,7 @@
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import org.gradle.api.tasks.bundling.Zip
+import org.gradle.api.tasks.bundling.Tar
+import org.gradle.api.tasks.bundling.Compression
 import org.gradle.jvm.tasks.Jar
 import java.net.HttpURLConnection
 import java.net.URI
@@ -73,6 +75,7 @@ val mpvBuildCacheDir = rootProject.layout.projectDirectory.dir(".primo-cache/mpv
 val packagedResourcesRoot = layout.buildDirectory.dir("packaging-resources")
 val bundledMpvExe = packagedResourcesRoot.map { it.file("windows-x64/mpv/mpv.exe") }
 val bundledMpvNotice = packagedResourcesRoot.map { it.file("common/THIRD-PARTY-MPV.txt") }
+val isLinuxHost = System.getProperty("os.name").startsWith("Linux", ignoreCase = true)
 
 fun sha256(file: File): String {
     val digest = MessageDigest.getInstance("SHA-256")
@@ -220,10 +223,11 @@ compose.desktop {
         dependsOn("jar", ":core:jar")
 
         nativeDistributions {
-            targetFormats(TargetFormat.Exe, TargetFormat.Msi)
+            if (isLinuxHost) targetFormats(TargetFormat.Deb)
+            else targetFormats(TargetFormat.Exe, TargetFormat.Msi)
             packageName = "KodaMusic"
             packageVersion = "3.11.0"
-            description = "Koda Music desktop player for Windows"
+            description = "Koda Music desktop player"
             vendor = "Koda Music"
             licenseFile.set(rootProject.file("LICENSE"))
 
@@ -252,7 +256,7 @@ compose.desktop {
 // The resource-copy task owns the mpv preparation dependency. This keeps the
 // packaging graph linear: prepare mpv -> copy app resources -> jpackage.
 tasks.matching { it.name.startsWith("prepare") && it.name.endsWith("AppResources") }
-    .configureEach { dependsOn(prepareBundledMpv) }
+    .configureEach { if (!isLinuxHost) dependsOn(prepareBundledMpv) }
 
 val portableAppImage = layout.buildDirectory.dir("compose/binaries/main/app/KodaMusic")
 
@@ -276,14 +280,14 @@ val verifyPortableImage by tasks.registering {
 
     doLast {
         val image = portableAppImage.get().asFile
-        val appDir = File(image, "app")
+        val appDir = File(image, if (isLinuxHost) "lib/app" else "app")
         val cfg = File(appDir, "KodaMusic.cfg")
-        val exe = File(image, "KodaMusic.exe")
-        val runtimeModules = File(image, "runtime/lib/modules")
+        val launcher = if (isLinuxHost) File(image, "bin/KodaMusic") else File(image, "KodaMusic.exe")
+        val runtimeModules = File(image, if (isLinuxHost) "lib/runtime/lib/modules" else "runtime/lib/modules")
         val jli = File(image, "runtime/bin/jli.dll")
         val jvm = File(image, "runtime/bin/server/jvm.dll")
 
-        check(exe.isFile) { "KodaMusic.exe nao foi gerado: ${exe.absolutePath}" }
+        check(launcher.isFile) { "KodaMusic nao foi gerado: ${launcher.absolutePath}" }
         check(cfg.isFile) { "KodaMusic.cfg nao foi gerado: ${cfg.absolutePath}" }
         check(runtimeModules.isFile) { "Runtime Java incompleto: ${runtimeModules.absolutePath}" }
 
@@ -340,15 +344,21 @@ val verifyPortableImage by tasks.registering {
         }
 
         File(image, "LEIA-ME.txt").writeText(
-            """
-            Koda Music 3.11.0 - Portable
+            if (isLinuxHost) """
+                Koda Music 3.11.0 - Linux x64
 
-            1. Mantenha toda esta pasta junta.
-            2. Abra KodaMusic.exe.
-            3. Java e mpv ja fazem parte do pacote.
+                Instale mpv no sistema (Ubuntu/Debian: sudo apt install mpv).
+                Mantenha a pasta inteira e execute bin/KodaMusic.
+                O runtime Java esta incluido; sem download e offline no app.
+            """.trimIndent() + "\n" else """
+                Koda Music 3.11.0 - Portable
 
-            O pacote foi validado antes da criacao do ZIP: MainKt, Kotlin,
-            Coroutines, Lifecycle, NewPipe, runtime Java e mpv foram conferidos.
+                1. Mantenha toda esta pasta junta.
+                2. Abra KodaMusic.exe.
+                3. Java e mpv ja fazem parte do pacote.
+
+                O pacote foi validado antes da criacao do ZIP: MainKt, Kotlin,
+                Coroutines, Lifecycle, NewPipe, runtime Java e mpv foram conferidos.
             """.trimIndent() + "\n",
             Charsets.UTF_8,
         )
@@ -375,4 +385,15 @@ val portableZip by tasks.registering(Zip::class) {
         println("PORTABLE GERADO COM SUCESSO")
         println("ZIP: ${archiveFile.get().asFile.absolutePath}")
     }
+}
+
+val linuxPortableTar by tasks.registering(Tar::class) {
+    group = "distribution"
+    description = "Builds a Linux x64 portable app image with bundled Java runtime. Requires system mpv."
+    dependsOn(verifyPortableImage)
+    onlyIf { isLinuxHost }
+    from(portableAppImage) { into("KodaMusic-3.11.0-Linux") }
+    compression = Compression.GZIP
+    archiveFileName.set("KodaMusic-3.11.0-Linux-x64.tar.gz")
+    destinationDirectory.set(rootProject.layout.projectDirectory.dir("release"))
 }
