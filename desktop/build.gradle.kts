@@ -280,10 +280,10 @@ val verifyPortableImage by tasks.registering {
 
     doLast {
         val image = portableAppImage.get().asFile
-        val appDir = File(image, "app")
+        val appDir = File(image, if (isLinuxHost) "lib/app" else "app")
         val cfg = File(appDir, "KodaMusic.cfg")
         val launcher = if (isLinuxHost) File(image, "bin/KodaMusic") else File(image, "KodaMusic.exe")
-        val runtimeModules = File(image, "runtime/lib/modules")
+        val runtimeModules = File(image, if (isLinuxHost) "lib/runtime/lib/modules" else "runtime/lib/modules")
         val jli = File(image, "runtime/bin/jli.dll")
         val jvm = File(image, "runtime/bin/server/jvm.dll")
 
