@@ -3,6 +3,8 @@ name: Koda Music Android TV Preview
 on:
   push:
     branches: [koda-android-tv-preview-build]
+  pull_request:
+    branches: [koda-android-final-3110]
   workflow_dispatch:
 
 jobs:
