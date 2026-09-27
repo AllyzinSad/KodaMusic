@@ -56,12 +56,12 @@ public class MainActivity extends Activity {
     s.addView(r);
 
     r.addView(t("Koda Cut",28,true,TEXT));
-    TextView badge=t("ANDROID • BETA 0.4 TOOLS",12,true,GOLD);
+    TextView badge=t("ANDROID • BETA 0.5 DYNAMIC",12,true,GOLD);
     badge.setPadding(0,dp(2),0,dp(14));
     r.addView(badge);
 
     TextView intro=t(
-      "Editor automático local com ferramentas genéricas de composição. A IA decide a edição com você; o Koda Cut executa.",
+      "Motor de edição local: composição, reenquadramento, legendas dinâmicas e mixagem. A IA planeja; o Koda Cut executa.",
       14,false,MUTED
     );
     intro.setPadding(0,0,0,dp(16));
@@ -159,7 +159,7 @@ public class MainActivity extends Activity {
     r.addView(clear,lp(14));
 
     TextView foot=t(
-      "Beta 0.4: amplia o motor com composição em camadas, reenquadramento, formatos e posicionamento genérico.",
+      "Beta 0.5: legendas estilizadas por palavra, canvas cover/contain, posições precisas e fades de áudio.",
       12,false,MUTED
     );
     foot.setPadding(0,dp(18),0,0);
@@ -307,10 +307,11 @@ public class MainActivity extends Activity {
     s.append("Use SOMENTE os IDs do MAPA DE ARQUIVOS. Não invente assets.\n");
     s.append("Quando eu disser \"pode começar a editar\", gere APENAS um KodaScript JSON em um único bloco de código.\n\n");
 
-    s.append("FORMATO KODASCRIPT ANDROID BETA 0.4:\n");
+    s.append("FORMATO KODASCRIPT ANDROID BETA 0.5:\n");
     s.append("{\n");
     s.append("  \"koda_version\": \"android-0.2\",\n");
     s.append("  \"format\": \"9:16\",\n");
+    s.append("  \"main_fit\": \"cover\",\n");
     s.append("  \"timeline\": [\n");
     s.append("    {\"action\":\"clip\",\"start\":0.0,\"end\":4.0},\n");
     s.append("    {\"action\":\"overlay\",\"at\":1.2,\"duration\":1.5,\"asset\":\"image:ID_DO_MAPA\",\"position\":\"bottom-right\"},\n");
@@ -318,7 +319,8 @@ public class MainActivity extends Activity {
     s.append("    {\"action\":\"music\",\"start\":0.0,\"end\":20.0,\"asset\":\"music:ID_DO_MAPA\",\"volume\":0.12},\n");
     s.append("    {\"action\":\"zoom\",\"start\":2.0,\"end\":3.0,\"scale\":1.15},\n");
     s.append("    {\"action\":\"text\",\"start\":3.0,\"end\":5.0,\"text\":\"TEXTO\",\"font\":\"font:anton\",\"position\":\"bottom-center\"},\n");
-    s.append("    {\"action\":\"video_layer\",\"asset\":\"video:principal\",\"start\":0.0,\"end\":8.0,\"source_start\":0.0,\"crop\":{\"x\":0,\"y\":0,\"width\":640,\"height\":360},\"width\":520,\"position\":\"top-center\",\"audio\":false}\n");
+    s.append("    {\"action\":\"video_layer\",\"asset\":\"video:principal\",\"start\":0.0,\"end\":8.0,\"source_start\":0.0,\"crop\":{\"x\":0,\"y\":0,\"width\":640,\"height\":360},\"width\":520,\"position\":\"top-center\",\"audio\":false},\n");
+    s.append("    {\"action\":\"caption\",\"start\":5.0,\"end\":6.5,\"words\":[{\"text\":\"OLHA\",\"color\":\"#FFFFFF\"},{\"text\":\"ISSO!\",\"color\":\"#FFD400\"}],\"font\":\"font:poppins\",\"position\":\"bottom-center\",\"size\":72}\n");
     s.append("  ]\n");
     s.append("}\n\n");
 
@@ -333,7 +335,12 @@ public class MainActivity extends Activity {
     s.append("- video_layer pode reutilizar o vídeo principal ou usar um ID video:* do mapa.\n");
     s.append("- video_layer aceita crop {x,y,width,height}, width, position, source_start e audio.\n");
     s.append("- Para composição de live/reels, o mesmo vídeo pode aparecer em mais de uma camada com crops diferentes.\n");
-    s.append("- Formatos suportados nesta beta: 9:16, 16:9, 1:1 e 4:5.\n");
+    s.append("- Formatos suportados: 9:16, 16:9, 1:1 e 4:5.\n");
+    s.append("- main_fit pode ser cover (preenche/corta) ou contain (encaixa com barras).\n");
+    s.append("- overlay, video_layer, text e caption aceitam position; x/y numéricos podem sobrescrever a posição.\n");
+    s.append("- caption aceita text ou words [{text,color}] para destacar palavras.\n");
+    s.append("- text/caption aceitam color, stroke_color, background_color, size e font.\n");
+    s.append("- music aceita fade_in e fade_out em segundos.\n");
     s.append("- Se ainda não houver informação suficiente, continue conversando em vez de inventar.\n\n");
 
     s.append("PACK DE FONTES DISPONÍVEIS:\n");
@@ -430,7 +437,7 @@ public class MainActivity extends Activity {
       for(String id:v.assetRefs)m.append("• ").append(id).append("\n");
     }
 
-    m.append("\nKodaScript pronto para o primeiro motor de render.");
+    m.append("\nKodaScript pronto para o motor Beta 0.5.");
 
     new AlertDialog.Builder(this)
       .setTitle("Resumo da edição")
@@ -514,10 +521,28 @@ public class MainActivity extends Activity {
             }
           }
         }
+
+        if("caption".equals(action)){
+          boolean hasText=!ev.optString("text","").trim().isEmpty();
+          JSONArray words=ev.optJSONArray("words");
+          if(!hasText && (words==null || words.length()==0)){
+            v.message="Evento "+(i+1)+": caption precisa de text ou words.";
+            return v;
+          }
+          if(words!=null){
+            for(int wi=0;wi<words.length();wi++){
+              JSONObject word=words.optJSONObject(wi);
+              if(word==null || word.optString("text","").trim().isEmpty()){
+                v.message="Evento "+(i+1)+": words possui item sem text.";
+                return v;
+              }
+            }
+          }
+        }
       }
 
       if(clipCount>1){
-        v.message="A Beta 0.3 aceita apenas um evento clip no primeiro motor de render.";
+        v.message="A Beta 0.5 aceita apenas um evento clip neste motor de render.";
         return v;
       }
 
