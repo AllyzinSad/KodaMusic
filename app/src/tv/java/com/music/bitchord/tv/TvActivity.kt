@@ -6,6 +6,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.compose.BackHandler
 import androidx.activity.viewModels
 import androidx.compose.foundation.background
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
@@ -87,6 +88,8 @@ private fun TvApp(model: MainViewModel) {
     var page by remember { mutableStateOf("Início") }
     var fullPlayer by remember { mutableStateOf(false) }
     var search by remember { mutableStateOf("") }
+    var sidebarFocused by remember { mutableStateOf(false) }
+    val sidebarWidth by animateDpAsState(if (sidebarFocused) 208.dp else 86.dp, label = "TV sidebar")
     val goPlay: (Song) -> Unit = { song -> controller?.let { scope.launch { it.playSongs(listOf(song), 0) } } }
 
     BackHandler(fullPlayer) { fullPlayer = false }
@@ -101,22 +104,34 @@ private fun TvApp(model: MainViewModel) {
         }
         Row(Modifier.fillMaxSize().background(canvas)) {
             Column(
-                Modifier.width(208.dp).fillMaxHeight().background(Color(0xFF100D1A)).padding(22.dp),
+                Modifier.width(sidebarWidth).fillMaxHeight()
+                    .onFocusChanged { sidebarFocused = it.hasFocus }
+                    .background(Color(0xFF100D1A)).padding(horizontal = 12.dp, vertical = 22.dp),
                 verticalArrangement = Arrangement.spacedBy(13.dp)
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    androidx.compose.foundation.Image(painterResource(R.drawable.koda_mark), null, Modifier.size(44.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text("Koda Music", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 17.sp)
+                    androidx.compose.foundation.Image(painterResource(R.drawable.koda_mark), "Koda Music", Modifier.size(48.dp))
+                    if (sidebarFocused) {
+                        Spacer(Modifier.width(8.dp))
+                        Text("Koda Music", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 17.sp, maxLines = 1)
+                    }
                 }
                 Spacer(Modifier.height(24.dp))
-                listOf("Início", "Explorar", "Buscar", "Biblioteca").forEach { label ->
+                listOf("Início" to "⌂", "Explorar" to "✦", "Buscar" to "⌕", "Biblioteca" to "▣").forEach { (label, symbol) ->
                     FocusTile(selected = page == label, onClick = { page = label }) {
-                        Text(label, color = Color.White, fontSize = 17.sp, fontWeight = if (page == label) FontWeight.Bold else FontWeight.Normal)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(symbol, color = if (page == label) Color.White else violet, fontSize = 25.sp,
+                                modifier = Modifier.width(30.dp))
+                            if (sidebarFocused) {
+                                Spacer(Modifier.width(8.dp))
+                                Text(label, color = Color.White, fontSize = 17.sp, maxLines = 1,
+                                    fontWeight = if (page == label) FontWeight.Bold else FontWeight.Normal)
+                            }
+                        }
                     }
                 }
                 Spacer(Modifier.weight(1f))
-                Text("KODA MUSIC  •  TV", color = Color(0xFFAD9FBE), fontSize = 11.sp)
+                if (sidebarFocused) Text("KODA MUSIC  •  TV", color = Color(0xFFAD9FBE), fontSize = 11.sp)
             }
             Column(Modifier.weight(1f).fillMaxHeight().padding(start = 28.dp, end = 28.dp, top = 26.dp, bottom = 16.dp)) {
                 when (page) {
@@ -130,7 +145,7 @@ private fun TvApp(model: MainViewModel) {
                             TvButton("Buscar") { if (search.isNotBlank()) model.searchFor(search.trim()) }
                         }
                         Spacer(Modifier.height(20.dp))
-                        LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                             when (val state = results) {
                                 is UiState.Success -> items(state.data) { result ->
                                     val song = when (result) { is SearchResult.Track -> result.song; is SearchResult.TopTrack -> result.song; else -> null }
@@ -142,14 +157,16 @@ private fun TvApp(model: MainViewModel) {
                             }
                         }
                     }
-                    "Biblioteca" -> Placeholder("Sua biblioteca", "Entre na sua conta pelo celular para sincronizar suas músicas. A integração da biblioteca na TV está em preparação.")
+                    "Biblioteca" -> Box(Modifier.weight(1f)) {
+                        Placeholder("Sua biblioteca", "Entre na sua conta pelo celular para sincronizar suas músicas. A integração da biblioteca na TV está em preparação.")
+                    }
                     else -> {
                         val title = if (page == "Explorar") "Explore novas músicas" else "Sua música na tela grande"
                         Text("KODA MUSIC TV", color = violet, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                         Text(title, color = Color.White, fontSize = 32.sp, fontWeight = FontWeight.Bold)
                         Text("Escolha uma capa com o controle remoto e dê o play.", color = Color(0xFFBBAFC9), fontSize = 15.sp)
                         Spacer(Modifier.height(20.dp))
-                        LazyColumn(verticalArrangement = Arrangement.spacedBy(22.dp)) {
+                        LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(22.dp)) {
                             when (val state = home) {
                                 is UiState.Success -> items(state.data) { shelf ->
                                     val playable = shelf.items.filter { it.videoId != null }.take(14)
@@ -179,7 +196,7 @@ private fun TvApp(model: MainViewModel) {
                     ) {
                         AsyncImage(song.artworkAt(120), null, Modifier.size(52.dp).clip(RoundedCornerShape(9.dp)), contentScale = ContentScale.Crop)
                         Spacer(Modifier.width(14.dp))
-                        Column(Modifier.weight(1f)) {
+                        Column(Modifier.weight(1f).clickable { fullPlayer = true }) {
                             Text(song.title, maxLines = 1, overflow = TextOverflow.Ellipsis, color = Color.White, fontWeight = FontWeight.Bold)
                             Text(song.artist, maxLines = 1, color = Color.LightGray)
                         }
