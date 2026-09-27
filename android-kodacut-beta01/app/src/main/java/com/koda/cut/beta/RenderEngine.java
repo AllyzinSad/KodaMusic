@@ -239,8 +239,10 @@ public class RenderEngine {
                 }
             }
 
-            if ("text".equals(action)) {
-                File file = createTextImage(event, fonts, cache, outW, i);
+            if ("text".equals(action) || "caption".equals(action)) {
+                File file = "caption".equals(action)
+                    ? createCaptionImage(event, fonts, cache, outW, i)
+                    : createTextImage(event, fonts, cache, outW, i);
                 args.add("-loop");
                 args.add("1");
                 args.add("-i");
@@ -289,10 +291,18 @@ public class RenderEngine {
 
         StringBuilder filters = new StringBuilder();
 
-        filters.append("[0:v]scale=").append(outW).append(":").append(outH)
-            .append(":force_original_aspect_ratio=decrease,pad=")
-            .append(outW).append(":").append(outH)
-            .append(":(ow-iw)/2:(oh-ih)/2:black,setsar=1[v0];");
+        String mainFit = root.optString("main_fit", "contain");
+        if ("cover".equalsIgnoreCase(mainFit)) {
+            filters.append("[0:v]scale=").append(outW).append(":").append(outH)
+                .append(":force_original_aspect_ratio=increase,crop=")
+                .append(outW).append(":").append(outH)
+                .append(":(iw-ow)/2:(ih-oh)/2,setsar=1[v0];");
+        } else {
+            filters.append("[0:v]scale=").append(outW).append(":").append(outH)
+                .append(":force_original_aspect_ratio=decrease,pad=")
+                .append(outW).append(":").append(outH)
+                .append(":(ow-iw)/2:(oh-ih)/2:black,setsar=1[v0];");
+        }
 
         String currentVideo = "v0";
         int stage = 1;
@@ -356,7 +366,7 @@ public class RenderEngine {
                 }
                 filters.append("[").append(ov).append("];");
 
-                String[] xy = overlayPosition(event.optString("position", "bottom-right"));
+                String[] xy = eventPosition(event, false, "bottom-right");
 
                 filters.append("[").append(currentVideo).append("][").append(ov)
                     .append("]overlay=").append(xy[0]).append(":").append(xy[1])
@@ -397,7 +407,7 @@ public class RenderEngine {
                 filters.append(",setpts=PTS-STARTPTS+").append(fmt(start)).append("/TB[")
                     .append(layer).append("];");
 
-                String[] xy = overlayPosition(event.optString("position", "top-center"));
+                String[] xy = eventPosition(event, false, "top-center");
 
                 filters.append("[").append(currentVideo).append("][").append(layer)
                     .append("]overlay=").append(xy[0]).append(":").append(xy[1])
@@ -409,7 +419,7 @@ public class RenderEngine {
                 stage++;
             }
 
-            if ("text".equals(action)) {
+            if ("text".equals(action) || "caption".equals(action)) {
                 InputEvent input = findEvent(visualInputs, i);
                 if (input == null) continue;
 
@@ -417,7 +427,7 @@ public class RenderEngine {
                 double end = Math.max(start, event.optDouble("end", start + 2) - clipStart);
                 String next = "v" + stage;
 
-                String[] txy = textPosition(event.optString("position", "bottom-center"));
+                String[] txy = eventPosition(event, true, "bottom-center");
                 filters.append("[").append(currentVideo).append("][")
                     .append(input.inputIndex).append(":v]")
                     .append("overlay=").append(txy[0]).append(":").append(txy[1]).append(":")
@@ -463,9 +473,20 @@ public class RenderEngine {
                 double length = Math.max(0.05, end - start);
                 long delay = (long)(start * 1000.0);
 
+                double fadeIn = Math.max(0, Math.min(length, event.optDouble("fade_in", 0)));
+                double fadeOut = Math.max(0, Math.min(length, event.optDouble("fade_out", 0)));
+
                 filters.append("[").append(input.inputIndex).append(":a]")
-                    .append("aresample=44100,atrim=0:").append(fmt(length))
-                    .append(",adelay=").append(delay).append("|").append(delay)
+                    .append("aresample=44100,atrim=0:").append(fmt(length));
+                if (fadeIn > 0) {
+                    filters.append(",afade=t=in:st=0:d=").append(fmt(fadeIn));
+                }
+                if (fadeOut > 0) {
+                    filters.append(",afade=t=out:st=")
+                        .append(fmt(Math.max(0, length - fadeOut)))
+                        .append(":d=").append(fmt(fadeOut));
+                }
+                filters.append(",adelay=").append(delay).append("|").append(delay)
                     .append(",volume=").append(fmt(volume))
                     .append("[").append(label).append("];");
             }
@@ -679,13 +700,32 @@ public class RenderEngine {
         float x = bitmapWidth / 2f;
         float y = (bitmapHeight - fm.bottom - fm.top) / 2f;
 
+        String background = event.optString("background_color", "");
+        if (!background.isEmpty() && !"transparent".equalsIgnoreCase(background)) {
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(parseColorSafe(background, 0xAA000000));
+            float tw = paint.measureText(text);
+            float padX = Math.max(20f, textSize * 0.28f);
+            float padY = Math.max(12f, textSize * 0.18f);
+            canvas.drawRoundRect(
+                x - tw / 2f - padX,
+                y + fm.top - padY,
+                x + tw / 2f + padX,
+                y + fm.bottom + padY,
+                Math.max(16f, textSize * 0.2f),
+                Math.max(16f, textSize * 0.2f),
+                paint
+            );
+        }
+
         paint.setStyle(Paint.Style.STROKE);
-        paint.setStrokeWidth(Math.max(4f, textSize / 14f));
-        paint.setColor(Color.BLACK);
+        paint.setStrokeJoin(Paint.Join.ROUND);
+        paint.setStrokeWidth(Math.max(4f, event.optInt("stroke_width", Math.max(4, textSize / 14))));
+        paint.setColor(parseColorSafe(event.optString("stroke_color", "#000000"), Color.BLACK));
         canvas.drawText(text, x, y, paint);
 
         paint.setStyle(Paint.Style.FILL);
-        paint.setColor(Color.WHITE);
+        paint.setColor(parseColorSafe(event.optString("color", "#FFFFFF"), Color.WHITE));
         canvas.drawText(text, x, y, paint);
 
         File out = new File(dir, "text_" + eventIndex + ".png");
@@ -698,6 +738,141 @@ public class RenderEngine {
         }
 
         return out;
+    }
+
+    private File createCaptionImage(
+        JSONObject event,
+        Map<String, File> fonts,
+        File dir,
+        int outW,
+        int eventIndex
+    ) throws Exception {
+        String fontId = event.optString("font", "font:poppins");
+        File fontFile = fonts.get(fontId);
+        if (fontFile == null) fontFile = fonts.get("font:poppins");
+
+        int bitmapWidth = Math.max(520, outW - 60);
+        int bitmapHeight = Math.max(220, outW / 3);
+        int textSize = event.optInt("size", Math.max(48, outW / 15));
+
+        JSONArray words = event.optJSONArray("words");
+        if (words == null || words.length() == 0) {
+            JSONObject single = new JSONObject();
+            single.put("text", event.optString("text", ""));
+            single.put("color", event.optString("color", "#FFFFFF"));
+            words = new JSONArray();
+            words.put(single);
+        }
+
+        Bitmap bitmap = Bitmap.createBitmap(
+            bitmapWidth,
+            bitmapHeight,
+            Bitmap.Config.ARGB_8888
+        );
+        Canvas canvas = new Canvas(bitmap);
+        canvas.drawColor(Color.TRANSPARENT);
+
+        Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        paint.setTypeface(Typeface.createFromFile(fontFile));
+        paint.setTextAlign(Paint.Align.LEFT);
+        paint.setTextSize(textSize);
+        paint.setStrokeJoin(Paint.Join.ROUND);
+
+        float spaceWidth = paint.measureText(" ");
+        float totalWidth = 0f;
+        for (int i = 0; i < words.length(); i++) {
+            JSONObject word = words.getJSONObject(i);
+            totalWidth += paint.measureText(word.optString("text", ""));
+            if (i < words.length() - 1) totalWidth += spaceWidth;
+        }
+
+        float maxWidth = bitmapWidth - 40f;
+        while (totalWidth > maxWidth && textSize > 28) {
+            textSize -= 2;
+            paint.setTextSize(textSize);
+            spaceWidth = paint.measureText(" ");
+            totalWidth = 0f;
+            for (int i = 0; i < words.length(); i++) {
+                JSONObject word = words.getJSONObject(i);
+                totalWidth += paint.measureText(word.optString("text", ""));
+                if (i < words.length() - 1) totalWidth += spaceWidth;
+            }
+        }
+
+        Paint.FontMetrics fm = paint.getFontMetrics();
+        float startX = (bitmapWidth - totalWidth) / 2f;
+        float baseline = (bitmapHeight - fm.bottom - fm.top) / 2f;
+
+        String background = event.optString("background_color", "");
+        if (!background.isEmpty() && !"transparent".equalsIgnoreCase(background)) {
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(parseColorSafe(background, 0xAA000000));
+            float padX = Math.max(20f, textSize * 0.28f);
+            float padY = Math.max(12f, textSize * 0.18f);
+            canvas.drawRoundRect(
+                startX - padX,
+                baseline + fm.top - padY,
+                startX + totalWidth + padX,
+                baseline + fm.bottom + padY,
+                Math.max(16f, textSize * 0.2f),
+                Math.max(16f, textSize * 0.2f),
+                paint
+            );
+        }
+
+        float x = startX;
+        int strokeColor = parseColorSafe(event.optString("stroke_color", "#000000"), Color.BLACK);
+        float strokeWidth = Math.max(4f, event.optInt("stroke_width", Math.max(4, textSize / 14)));
+
+        for (int i = 0; i < words.length(); i++) {
+            JSONObject word = words.getJSONObject(i);
+            String value = word.optString("text", "");
+            int fill = parseColorSafe(
+                word.optString("color", event.optString("color", "#FFFFFF")),
+                Color.WHITE
+            );
+
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeWidth(strokeWidth);
+            paint.setColor(strokeColor);
+            canvas.drawText(value, x, baseline, paint);
+
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(fill);
+            canvas.drawText(value, x, baseline, paint);
+
+            x += paint.measureText(value);
+            if (i < words.length() - 1) x += spaceWidth;
+        }
+
+        File out = new File(dir, "caption_" + eventIndex + ".png");
+        try (FileOutputStream stream = new FileOutputStream(out)) {
+            if (!bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream)) {
+                throw new Exception("Não consegui preparar a legenda da edição.");
+            }
+        } finally {
+            bitmap.recycle();
+        }
+        return out;
+    }
+
+    private int parseColorSafe(String value, int fallback) {
+        try {
+            return Color.parseColor(value);
+        } catch (Exception ignored) {
+            return fallback;
+        }
+    }
+
+    private String[] eventPosition(JSONObject event, boolean text, String fallbackPosition) {
+        if (event.has("x") && event.has("y")) {
+            return new String[]{
+                String.valueOf(event.optInt("x", 0)),
+                String.valueOf(event.optInt("y", 0))
+            };
+        }
+        String position = event.optString("position", fallbackPosition);
+        return text ? textPosition(position) : overlayPosition(position);
     }
 
     private void copy(InputStream in, OutputStream out) throws Exception {
