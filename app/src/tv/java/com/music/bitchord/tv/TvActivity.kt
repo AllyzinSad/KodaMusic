@@ -79,6 +79,7 @@ import com.music.bitchord.playback.playSongs
 import com.music.bitchord.playback.rememberMediaController
 import com.music.bitchord.playback.rememberPlayerState
 import com.music.bitchord.data.innertube.StreamResolver
+import com.music.bitchord.data.settings.AppSettings
 import com.music.bitchord.ui.MainViewModel
 import com.music.bitchord.ui.theme.rememberArtworkPalette
 import kotlinx.coroutines.launch
@@ -92,6 +93,8 @@ class TvActivity : ComponentActivity() {
     private val model: MainViewModel by viewModels()
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // TV's Back/close and Recents dismissal both end the playback session.
+        AppSettings.setStopOnTaskRemoved(true)
         WindowCompat.setDecorFitsSystemWindows(window, false)
         WindowInsetsControllerCompat(window, window.decorView).apply {
             hide(WindowInsetsCompat.Type.systemBars())
