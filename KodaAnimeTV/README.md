@@ -1,4 +1,4 @@
-# Koda Anime TV — versão de teste 0.2
+# Koda Anime TV — versão de teste 0.3
 
 Projeto Android TV em Java. Visual preto/branco/vermelho inspirado em `design/referencia-aprovada.png` (a imagem é apenas referência; a interface é nativa e interativa). Navegação com D-pad, catálogo, pesquisa com filtros, favoritos, player e vinculação Google por código.
 
@@ -8,7 +8,7 @@ Abra esta pasta no Android Studio com JDK 17, Android SDK 35 e conexão para bai
 
 Também há `.github/workflows/android.yml`. Envie o conteúdo desta pasta para um repositório GitHub, execute **Actions > Android TV APK > Run workflow** e baixe o artefato `KodaAnimeTV-debug-apk`. Este ZIP é o código-fonte, não um APK compilado. Neste ambiente não havia Android SDK/Gradle para testar a compilação.
 
-Instale em Android TV/Google TV/Mi Stick (Android TV OS). Telas Samsung Tizen e LG webOS não executam APK. O ícone é 512 px; o banner da TV está em `res/drawable/tv_banner.png`.
+Instale em Android TV/Google TV/Mi Stick (Android TV OS) ou em um celular Android para testar. No celular a interface abre em paisagem e aparece no launcher normal. Telas Samsung Tizen e LG webOS não executam APK. O ícone é 512 px; o banner da TV está em `res/drawable/tv_banner.png`.
 
 ## Como testar
 
