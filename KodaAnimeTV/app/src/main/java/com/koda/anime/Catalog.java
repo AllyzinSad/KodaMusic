@@ -45,13 +45,13 @@ final class Catalog {
         });
     }
     static void episodes(Anime anime,Result callback){
-        Net.jsonArray("https://animestvs.org/episodios-recentes",(a,e)->{
+        String type=anime.title.toLowerCase(Locale.ROOT).contains("dublado")?"animes-dublados":"animes-legendados";
+        String endpoint="https://animestvs.org/"+type+"/"+Net.enc(anime.title).replace("+","%20")+"/episodios";
+        Net.jsonArray(endpoint,(a,e)->{
             ArrayList<Anime> found=new ArrayList<>();
             if(a!=null)for(int i=0;i<a.length();i++){
                 JSONObject j=a.optJSONObject(i);if(j==null)continue;
-                if(normalize(j.optString("anime")).equals(normalize(anime.title))){
-                    String url=j.optString("link_video","");if(url.startsWith("https://"))found.add(new Anime("episode-"+j.optString("id"),j.optString("anime"),j.optString("image"),j.optString("episodio"),j.optString("tipo"),0,url));
-                }
+                String url=j.optString("link_video","");if(url.startsWith("https://"))found.add(new Anime("episode-"+j.optString("id"),j.optString("anime",anime.title),j.optString("image",anime.poster),j.optString("episodio"),j.optString("tipo"),0,url));
             }
             if(anime.playUrl.startsWith("https://")){
                 boolean present=false;for(Anime x:found)if(x.playUrl.equals(anime.playUrl))present=true;

@@ -12,7 +12,7 @@ Instale em Android TV/Google TV/Mi Stick (Android TV OS) ou em um celular Androi
 
 ## Como testar
 
-1. Início carrega animes conhecidos e episódios recentes do catálogo de `animestvs.org`. Pesquisa usa `/animes?titulo=`; categorias filtram o catálogo completo pelo campo `generos`. Abra um card e escolha um episódio disponível. Temporada é inferida do título quando a fonte não informa campo próprio.
+1. Início carrega animes conhecidos e episódios recentes do catálogo de `animestvs.org`. Pesquisa usa `/animes?titulo=`; categorias filtram o catálogo completo pelo campo `generos`. Abra um card e escolha o episódio na rota `/animes-dublados/{titulo}/episodios` ou `/animes-legendados/{titulo}/episodios`. Temporada é inferida do título quando a fonte não informa campo próprio.
 2. Abra **Configurações > Verificar player**. Big Buck Bunny é um vídeo demonstrativo; confirme play/pause, voltar/avançar 10 segundos, qualidade e pular abertura (+90 segundos quando não houver marcação). Os controles somem após alguns segundos. Você também pode informar uma URL HTTPS autorizada de MP4/HLS. A lista de resoluções aparece apenas quando o vídeo tem múltiplas faixas; MP4 único mantém a qualidade original.
 3. Em **Configurações**, informe URL HTTPS de instâncias próprias/permitidas dos projetos `api-animesonline-cc` e/ou `SugoiAPI`. Sem URLs, o app não tenta obter episódios. Abra um anime e selecione **Buscar episódios nas fontes**. A fonte 1 tenta listar episódios e resolve o selecionado; a fonte 2 tenta o episódio 1. URLs MP4/HLS reconhecidas são passadas ao Media3. Os repositórios não fornecem um serviço hospedado estável; se retornarem outros campos, ajuste `Sources.java`. Não inclua credenciais/segredos das fontes no app.
 4. Favoritos são locais ao aparelho e separados pelo ID da conta Google vinculada. Vincular Google **não transfere a conta do Super Animes nem sincroniza favoritos entre TVs**.
@@ -25,7 +25,7 @@ Crie em seu projeto Google Cloud um OAuth client do tipo **TVs e dispositivos co
 
 ## Limitações desta versão
 
-- A lista de episódios diretos é obtida da janela de lançamentos recentes da fonte. Para títulos antigos, uma fonte configurada pode listar episódios adicionais; sem ela a lista pode ficar vazia. A disponibilidade depende das fontes e das permissões de uso do conteúdo.
+- A lista de episódios diretos é consultada pelo título do anime. Quando a fonte não disponibilizar uma lista para ele, uma fonte configurada pode oferecer episódios adicionais. A disponibilidade depende das fontes e das permissões de uso do conteúdo.
 - Nenhum servidor externo de episódios pôde ser testado a partir deste ambiente. As integrações são adaptadores iniciais que podem precisar de ajuste ao JSON real. Login Google real depende das credenciais do projeto do usuário e também não foi testado aqui.
 - A tela inicial é fiel à estrutura aprovada, mas usa capas dinâmicas dos animes retornados pelo catálogo. A imagem de referência contém títulos fictícios.
 - O vídeo de teste Big Buck Bunny é do Blender Foundation, publicado em licença Creative Commons Attribution 3.0.
