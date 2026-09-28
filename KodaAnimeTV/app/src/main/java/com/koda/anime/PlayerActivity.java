@@ -85,7 +85,7 @@ public final class PlayerActivity extends Activity {
     }
     @Override public boolean onKeyDown(int key,KeyEvent event){if(key==KeyEvent.KEYCODE_MEDIA_REWIND){seekBy(-10000);showControls();return true;}if(key==KeyEvent.KEYCODE_MEDIA_FAST_FORWARD){seekBy(10000);showControls();return true;}
         if(key==KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE && player!=null){if(player.isPlaying())player.pause();else player.play();showControls();return true;}
-        if(key==KeyEvent.KEYCODE_DPAD_CENTER && center.getVisibility()!=View.VISIBLE){showControls();playPause.requestFocus();return true;}
+        if((key==KeyEvent.KEYCODE_DPAD_CENTER||key==KeyEvent.KEYCODE_DPAD_UP||key==KeyEvent.KEYCODE_DPAD_DOWN||key==KeyEvent.KEYCODE_DPAD_LEFT||key==KeyEvent.KEYCODE_DPAD_RIGHT)&&center.getVisibility()!=View.VISIBLE){showControls();playPause.requestFocus();return true;}
         if(key==KeyEvent.KEYCODE_DPAD_UP||key==KeyEvent.KEYCODE_DPAD_DOWN||key==KeyEvent.KEYCODE_DPAD_LEFT||key==KeyEvent.KEYCODE_DPAD_RIGHT)showControls();
         return super.onKeyDown(key,event);}
     @Override protected void onStop(){save(false);if(player!=null){player.release();player=null;video.setPlayer(null);}super.onStop();}
