@@ -1,4 +1,4 @@
-# Koda Anime TV — versão de teste 0.5
+# Koda Anime TV — versão de teste 0.6
 
 Projeto Android TV e celular em Java. Visual preto/branco/vermelho inspirado em `design/referencia-aprovada.png` (a imagem é apenas referência; a interface é nativa e interativa). Navegação com D-pad, catálogo, pesquisa com filtros, favoritos, histórico local, retomada, player e vinculação Google por código.
 
@@ -12,7 +12,7 @@ Instale em Android TV/Google TV/Mi Stick (Android TV OS) ou em um celular Androi
 
 ## Como testar
 
-1. Início carrega animes conhecidos e episódios recentes do catálogo de `animestvs.org`. Pesquisa e categorias percorrem as 8 mil+ entradas do catálogo em páginas de 40 e mostram títulos adicionais do Kitsu como metadados. Abra um card para a página própria com capa, sinopse, versões/temporadas e episódios. A fonte de vídeo usa `/animes-dublados/{titulo}/episodios` ou `/animes-legendados/{titulo}/episodios`. Temporada é inferida do título quando a fonte não informa campo próprio. Especiais e filmes têm identificação distinta.
+1. Início carrega animes conhecidos e episódios recentes do catálogo de `animestvs.org`. Pesquisa e categorias percorrem as 8 mil+ entradas do catálogo em páginas de 40 e mostram títulos adicionais do Kitsu como metadados. Abra um card para a página própria com capa e sinopse; as temporadas, idiomas e episódios ficam agrupados em um painel único. A fonte de vídeo usa `/animes-dublados/{titulo}/episodios` ou `/animes-legendados/{titulo}/episodios`. Temporada é inferida do título quando a fonte não informa campo próprio. Especiais e filmes têm identificação distinta.
 2. Abra **Configurações > Verificar player**. Big Buck Bunny é um vídeo demonstrativo; confirme play/pause, voltar/avançar 10 segundos, qualidade e pular abertura (+90 segundos quando não houver marcação). Os controles somem após alguns segundos. Você também pode informar uma URL HTTPS autorizada de MP4/HLS. A lista de resoluções aparece apenas quando o vídeo tem múltiplas faixas; MP4 único mantém a qualidade original.
 3. Em **Configurações**, informe URL HTTPS de instâncias próprias/permitidas dos projetos `api-animesonline-cc` e/ou `SugoiAPI`. Sem URLs, o app não tenta obter episódios. Abra um anime e selecione **Buscar episódios nas fontes**. A fonte 1 tenta listar episódios e resolve o selecionado; a fonte 2 tenta o episódio 1. URLs MP4/HLS reconhecidas são passadas ao Media3. Os repositórios não fornecem um serviço hospedado estável; se retornarem outros campos, ajuste `Sources.java`. Não inclua credenciais/segredos das fontes no app.
 4. Favoritos são locais ao aparelho e separados pelo ID da conta Google vinculada. Vincular Google **não transfere a conta do Super Animes nem sincroniza favoritos entre TVs**.

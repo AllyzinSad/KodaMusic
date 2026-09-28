@@ -90,6 +90,7 @@ final class Catalog {
     }
     static int episodeNumber(String label){java.util.regex.Matcher m=java.util.regex.Pattern.compile("\\d+").matcher(label);return m.find()?Integer.parseInt(m.group()):0;}
     static int seasonNumber(String title){
+        title=title.replaceAll("(?i)\\s*\\(dublado\\)\\s*$","").trim();
         java.util.regex.Matcher m=java.util.regex.Pattern.compile("(?i)(?:season|temporada)\\s*(\\d+)|(\\d+)(?:st|nd|rd|th|ª|º)?\\s*(?:season|temporada)").matcher(title);
         if(m.find())try{return Integer.parseInt(m.group(1)!=null?m.group(1):m.group(2));}catch(Exception ignored){}
         m=java.util.regex.Pattern.compile("(?:\\s|^)s?(\\d+)$",java.util.regex.Pattern.CASE_INSENSITIVE).matcher(title.trim());

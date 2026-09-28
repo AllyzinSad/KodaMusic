@@ -122,55 +122,77 @@ public final class MainActivity extends Activity {
         });
     }
     private void showDetail(Anime a){selectedAnime=a;shell("Detalhes");
-        TextView back=button("‹  Voltar",()->backFromDetail());content.addView(back,new LinearLayout.LayoutParams(dp(140),dp(45)));
-        LinearLayout hero=new LinearLayout(this);LinearLayout.LayoutParams hp=new LinearLayout.LayoutParams(-1,-2);hp.topMargin=dp(17);content.addView(hero,hp);
+        TextView back=button("‹  Voltar",this::backFromDetail);content.addView(back,new LinearLayout.LayoutParams(dp(140),dp(44)));
+        LinearLayout hero=new LinearLayout(this);LinearLayout.LayoutParams hp=new LinearLayout.LayoutParams(-1,-2);hp.topMargin=dp(16);hp.bottomMargin=dp(20);content.addView(hero,hp);
         ImageView cover=new ImageView(this);cover.setScaleType(ImageView.ScaleType.CENTER_CROP);cover.setBackground(bg(0xFF29212A,12));cover.setClipToOutline(true);
-        hero.addView(cover,new LinearLayout.LayoutParams(dp(186),dp(260)));Net.image(a.poster,cover);
-        LinearLayout info=column();pad(info,27,0,0,0);hero.addView(info,new LinearLayout.LayoutParams(0,-2,1));
-        TextView name=label(a.title,29,WHITE,true);name.setMaxLines(2);info.addView(name);
+        hero.addView(cover,new LinearLayout.LayoutParams(dp(178),dp(248)));Net.image(a.poster,cover);
+        LinearLayout info=column();pad(info,26,0,0,0);hero.addView(info,new LinearLayout.LayoutParams(0,-2,1));
+        TextView name=label(a.title,28,WHITE,true);name.setMaxLines(2);info.addView(name);
         TextView meta=label(Catalog.seasonLabel(a.title)+"  ·  "+(a.genre.isEmpty()?"Anime":a.genre)+(a.episodes>0?"  ·  "+a.episodes+" episódios":""),15,RED,true);
-        LinearLayout.LayoutParams mp=new LinearLayout.LayoutParams(-1,-2);mp.topMargin=dp(11);info.addView(meta,mp);
+        LinearLayout.LayoutParams mp=new LinearLayout.LayoutParams(-1,-2);mp.topMargin=dp(9);info.addView(meta,mp);
         TextView synopsis=label(a.description.isEmpty()?"Sinopse não disponível nesta fonte.":a.description,16,MUTED,false);synopsis.setMaxLines(6);synopsis.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(-1,-2);sp.topMargin=dp(15);info.addView(synopsis,sp);
-        LinearLayout actions=new LinearLayout(this);LinearLayout.LayoutParams ap=new LinearLayout.LayoutParams(-1,-2);ap.topMargin=dp(18);info.addView(actions,ap);
-        TextView fav=button(isFavorite(a)?"♥  Favorito":"♡  Favoritar",()->{toggleFavorite(a);showDetail(a);});addDetailAction(actions,fav);
+        LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(-1,-2);sp.topMargin=dp(13);info.addView(synopsis,sp);
+        LinearLayout heroActions=new LinearLayout(this);LinearLayout.LayoutParams ap=new LinearLayout.LayoutParams(-1,-2);ap.topMargin=dp(15);info.addView(heroActions,ap);
+        addDetailAction(heroActions,button(isFavorite(a)?"♥  Favorito":"♡  Favoritar",()->{toggleFavorite(a);showDetail(a);}));
         WatchHistory.Entry previous=null;for(WatchHistory.Entry e:WatchHistory.all(this))if(e.animeId.equals(historyId(a))){previous=e;break;}
-        if(previous!=null){WatchHistory.Entry h=previous;addDetailAction(actions,button("▶  Continuar "+h.episode,()->play(a,h.episode,h.url,"","",h.position)));}
-        heading("Temporadas e versões");HorizontalScrollView seasonScroll=new HorizontalScrollView(this);seasonScroll.setHorizontalScrollBarEnabled(false);
-        LinearLayout seasons=new LinearLayout(this);seasons.addView(label("Carregando...",15,MUTED,false));seasonScroll.addView(seasons);content.addView(seasonScroll);
-        Catalog.related(a,(related,error)->{if(!page.equals("Detalhes")||selectedAnime!=a)return;seasons.removeAllViews();
-            for(Anime variant:related){String title=Catalog.seasonLabel(variant.title)+(variant.title.toLowerCase(Locale.ROOT).contains("dublado")?" · Dublado":" · Legendado");
-                TextView chip=button(title,()->showDetail(variant));chip.setBackground(bg(variant.title.equals(a.title)?0xFF9A2133:0xFF292930,10));addDetailAction(seasons,chip);}
+        if(previous!=null){WatchHistory.Entry h=previous;addDetailAction(heroActions,button("▶  Continuar "+h.episode,()->play(a,h.episode,h.url,"","",h.position)));}
+        LinearLayout panel=column();pad(panel,20,18,20,20);panel.setBackground(bg(0xFF17171C,13));content.addView(panel,new LinearLayout.LayoutParams(-1,-2));
+        panel.addView(label("Episódios",24,WHITE,true));
+        TextView versionsTitle=label("TEMPORADAS",13,MUTED,true);LinearLayout.LayoutParams vtp=new LinearLayout.LayoutParams(-1,-2);vtp.topMargin=dp(18);vtp.bottomMargin=dp(8);panel.addView(versionsTitle,vtp);
+        HorizontalScrollView versionScroll=new HorizontalScrollView(this);versionScroll.setHorizontalScrollBarEnabled(false);panel.addView(versionScroll);
+        LinearLayout versions=new LinearLayout(this);versionScroll.addView(versions);versions.addView(label("Carregando temporadas...",15,MUTED,false));
+        TextView audioTitle=label("ÁUDIO",13,MUTED,true);LinearLayout.LayoutParams atp=new LinearLayout.LayoutParams(-1,-2);atp.topMargin=dp(18);atp.bottomMargin=dp(8);panel.addView(audioTitle,atp);
+        LinearLayout audio=new LinearLayout(this);panel.addView(audio);
+        View divider=new View(this);divider.setBackgroundColor(0xFF34343A);LinearLayout.LayoutParams dl=new LinearLayout.LayoutParams(-1,dp(1));dl.topMargin=dp(18);dl.bottomMargin=dp(16);panel.addView(divider,dl);
+        TextView count=label("Carregando episódios...",15,MUTED,false);panel.addView(count);
+        LinearLayout episodeList=column();LinearLayout.LayoutParams ep=new LinearLayout.LayoutParams(-1,-2);ep.topMargin=dp(10);panel.addView(episodeList,ep);
+        Catalog.related(a,(related,error)->{if(!page.equals("Detalhes")||selectedAnime!=a)return;versions.removeAllViews();audio.removeAllViews();
+            ArrayList<Anime> ordered=new ArrayList<>(related);ordered.sort((x,y)->{
+                int ax=Catalog.seasonLabel(x.title).startsWith("Temporada")?Catalog.seasonNumber(x.title):100;
+                int ay=Catalog.seasonLabel(y.title).startsWith("Temporada")?Catalog.seasonNumber(y.title):100;
+                return ax!=ay?ax-ay:x.title.compareToIgnoreCase(y.title);
+            });
+            LinkedHashSet<String> labels=new LinkedHashSet<>();for(Anime variant:ordered)labels.add(Catalog.seasonLabel(variant.title));
+            String selected=Catalog.seasonLabel(a.title);boolean dubbed=a.title.toLowerCase(Locale.ROOT).contains("dublado");
+            for(String season:labels){TextView tab=button(season,()->{Anime variant=findVersion(related,season,dubbed,true);if(variant!=null)showDetail(variant);});
+                tab.setBackground(bg(season.equals(selected)?0xFF9B2437:0xFF303037,9));addDetailAction(versions,tab);}
+            for(boolean wantDub:new boolean[]{true,false}){Anime variant=findVersion(related,selected,wantDub,false);if(variant==null)continue;
+                TextView tab=button(wantDub?"Dublado":"Legendado",()->showDetail(variant));tab.setBackground(bg(wantDub==dubbed?0xFF9B2437:0xFF303037,9));addDetailAction(audio,tab);}
+            if(audio.getChildCount()==0)audio.addView(label("Versão original",15,MUTED,false));
         });
-        heading("Episódios · "+Catalog.seasonLabel(a.title));LinearLayout episodeList=column();content.addView(episodeList);
-        episodeList.addView(label("Carregando episódios...",16,MUTED,false));
         Catalog.episodes(a,(eps,error)->{if(!page.equals("Detalhes")||selectedAnime!=a)return;episodeList.removeAllViews();
-            if(!eps.isEmpty()){appendEpisodes(episodeList,a,eps,0);return;}
-            episodeList.addView(label("Nenhum episódio direto encontrado nesta versão.",16,MUTED,false));
+            if(!eps.isEmpty()){count.setText(eps.size()+" episódios · "+Catalog.seasonLabel(a.title));appendEpisodes(episodeList,a,eps,0);return;}
+            count.setText("Nenhum episódio direto disponível nesta versão");
             Sources.find(this,a,(sources,sourceError)->{if(!page.equals("Detalhes")||selectedAnime!=a)return;
-                for(Sources.Episode ep:sources){TextView item=button(ep.label,()->Sources.resolve(ep,(url,err)->{
-                    if(err==null)play(a,ep.label,url,"","",0);else Toast.makeText(this,"Falha na fonte",Toast.LENGTH_SHORT).show();}));
-                    LinearLayout.LayoutParams ip=new LinearLayout.LayoutParams(-1,dp(58));ip.topMargin=dp(8);episodeList.addView(item,ip);}
+                for(Sources.Episode source:sources){TextView item=button(source.label,()->Sources.resolve(source,(url,err)->{
+                    if(err==null)play(a,source.label,url,"","",0);else Toast.makeText(this,"Falha na fonte",Toast.LENGTH_SHORT).show();}));
+                    LinearLayout.LayoutParams ip=new LinearLayout.LayoutParams(-1,dp(56));ip.topMargin=dp(8);episodeList.addView(item,ip);}
             });
         });
     }
-    private void addDetailAction(LinearLayout row,View v){LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-2,dp(48));lp.rightMargin=dp(12);row.addView(v,lp);}
+    private Anime findVersion(List<Anime> related,String season,boolean dubbed,boolean fallback){
+        for(Anime variant:related)if(Catalog.seasonLabel(variant.title).equals(season) && variant.title.toLowerCase(Locale.ROOT).contains("dublado")==dubbed)return variant;
+        if(fallback)for(Anime variant:related)if(Catalog.seasonLabel(variant.title).equals(season))return variant;
+        return null;
+    }
+    private void addDetailAction(LinearLayout row,View v){LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-2,dp(46));lp.rightMargin=dp(10);row.addView(v,lp);}
     private void appendEpisodes(LinearLayout host,Anime anime,List<Anime> eps,int start){
-        int end=Math.min(start+24,eps.size());for(int i=start;i<end;i+=2){LinearLayout line=new LinearLayout(this);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.bottomMargin=dp(13);host.addView(line,lp);
-            for(int j=i;j<Math.min(i+2,end);j++){final int index=j;Anime ep=eps.get(j);WatchHistory.Entry h=WatchHistory.find(this,historyId(anime),ep.description);
-                LinearLayout tile=column();tile.setFocusable(true);tile.setBackground(bg(0xFF1B1B20,11));tile.setClipToOutline(true);
-                LinearLayout.LayoutParams tp=new LinearLayout.LayoutParams(dp(240),dp(185));tp.rightMargin=dp(14);line.addView(tile,tp);
-                ImageView thumb=new ImageView(this);thumb.setScaleType(ImageView.ScaleType.CENTER_CROP);tile.addView(thumb,new LinearLayout.LayoutParams(-1,dp(125)));Net.image(ep.poster,thumb);
-                TextView title=label("▶  "+ep.description,17,WHITE,true);pad(title,11,5,5,0);tile.addView(title);
-                TextView status=label(h==null?"Não assistido":h.watched()?"✓ Assistido":"◐ Continuar em "+formatTime(h.position),12,h!=null&&h.watched()?RED:MUTED,false);pad(status,11,1,5,0);tile.addView(status);
-                tile.setOnFocusChangeListener((v,f)->{tile.setBackground(bg(f?0xFF902435:0xFF1B1B20,11));tile.setScaleX(f?1.02f:1f);tile.setScaleY(f?1.02f:1f);});
-                tile.setOnClickListener(v->{WatchHistory.Entry progress=WatchHistory.find(this,historyId(anime),ep.description);
-                    String nextUrl=index+1<eps.size()?eps.get(index+1).playUrl:"";String nextLabel=index+1<eps.size()?eps.get(index+1).description:"";
-                    play(anime,ep.description,ep.playUrl,nextUrl,nextLabel,progress==null||progress.watched()?0:progress.position);});
-            }
+        int end=Math.min(start+24,eps.size());for(int i=start;i<end;i++){final int index=i;Anime current=eps.get(i);WatchHistory.Entry watched=WatchHistory.find(this,historyId(anime),current.description);
+            LinearLayout row=new LinearLayout(this);row.setGravity(Gravity.CENTER_VERTICAL);row.setFocusable(true);row.setBackground(bg(0xFF24242A,10));
+            LinearLayout.LayoutParams rp=new LinearLayout.LayoutParams(-1,dp(106));rp.bottomMargin=dp(8);host.addView(row,rp);
+            ImageView thumb=new ImageView(this);thumb.setScaleType(ImageView.ScaleType.CENTER_CROP);row.addView(thumb,new LinearLayout.LayoutParams(dp(174),-1));Net.image(current.poster.isEmpty()?anime.poster:current.poster,thumb);
+            LinearLayout description=column();pad(description,16,5,5,5);row.addView(description,new LinearLayout.LayoutParams(0,-2,1));
+            description.addView(label(current.description,18,WHITE,true));
+            String state=watched==null?"Não assistido":watched.watched()?"✓ Assistido":"◐ Continuar em "+formatTime(watched.position);
+            TextView status=label(state,14,watched!=null&&watched.watched()?0xFF60C88A:MUTED,false);LinearLayout.LayoutParams st=new LinearLayout.LayoutParams(-1,-2);st.topMargin=dp(7);description.addView(status,st);
+            TextView arrow=label("▶",22,RED,true);pad(arrow,10,0,20,0);row.addView(arrow);
+            row.setOnFocusChangeListener((v,f)->row.setBackground(bg(f?0xFF823040:0xFF24242A,10)));
+            row.setOnClickListener(v->{WatchHistory.Entry progress=WatchHistory.find(this,historyId(anime),current.description);
+                String nextUrl=index+1<eps.size()?eps.get(index+1).playUrl:"";String nextLabel=index+1<eps.size()?eps.get(index+1).description:"";
+                play(anime,current.description,current.playUrl,nextUrl,nextLabel,progress==null||progress.watched()?0:progress.position);});
         }
         if(end<eps.size()){TextView more=button("Mostrar mais episódios  ↓",()->{host.removeViewAt(host.getChildCount()-1);appendEpisodes(host,anime,eps,end);});
-            host.addView(more,new LinearLayout.LayoutParams(dp(300),dp(52)));}
+            host.addView(more,new LinearLayout.LayoutParams(dp(300),dp(50)));}
     }
     private void backFromDetail(){String target=returnPage;selectedAnime=null;if(target.equals("Pesquisa"))showSearch();else if(target.equals("Favoritos"))showFavorites();else if(target.equals("Histórico"))showHistory();else showHome();}
     private void play(Anime a,String episode,String url,String nextUrl,String nextLabel,long position){Intent i=new Intent(this,PlayerActivity.class);
@@ -182,7 +204,7 @@ public final class MainActivity extends Activity {
         content.addView(label(name.isEmpty()?"Nenhuma conta vinculada":"Vinculado: "+name,17,MUTED,false));
         TextView link=button("Vincular conta por código",()->GoogleLink.show(this,()->showSettings()));LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(dp(290),-2);p.topMargin=dp(13);content.addView(link,p);
         TextView unlink=button("Desvincular",()->{getSharedPreferences("auth",0).edit().remove("sub").remove("name").apply();showSettings();});content.addView(unlink,new LinearLayout.LayoutParams(dp(190),-2));
-        heading("Fontes de episódios para teste");content.addView(label("Insira a URL HTTPS da sua instância das APIs. O catálogo é fornecido pelo Jikan; as fontes são opcionais.",16,MUTED,false));
+        heading("Fontes de episódios para teste");content.addView(label("Insira a URL HTTPS da sua instância das APIs. O catálogo principal usa animestvs.org, e o Kitsu complementa os metadados.",16,MUTED,false));
         android.content.SharedPreferences pref=getSharedPreferences("sources",0);
         EditText h=sourceField("URL da api-animesonline-cc",pref.getString("hallan",""));
         EditText s=sourceField("URL da SugoiAPI",pref.getString("sugoi",""));
