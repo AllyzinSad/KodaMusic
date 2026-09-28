@@ -18,9 +18,10 @@ public final class PlayerActivity extends Activity {
     private ExoPlayer player; private PlayerView video; private LinearLayout center,bottom; private TextView heading,playPause,quality,next,time;
     private SeekBar progress; private View tap; private boolean tracking; private long startPosition,openingEndMs=-1;
     private String url,title,animeId,poster,episode,nextUrl,nextLabel;
-    private int dp(int n){return (int)(getResources().getDisplayMetrics().density*n+.5f);}
+    private ScreenFit screenFit;
+    private int dp(int n){return screenFit.px(n);}
     private GradientDrawable bg(int color,int radius){GradientDrawable g=new GradientDrawable();g.setColor(color);g.setCornerRadius(dp(radius));return g;}
-    private TextView control(String text,int size,Runnable action){TextView v=new TextView(this);v.setText(text);v.setTextColor(WHITE);v.setTextSize(size);v.setGravity(Gravity.CENTER);v.setPadding(dp(14),dp(5),dp(14),dp(5));v.setBackground(bg(Color.TRANSPARENT,12));v.setFocusable(true);
+    private TextView control(String text,int size,Runnable action){TextView v=new TextView(this);v.setText(text);v.setTextColor(WHITE);v.setTextSize(size*screenFit.textScale(this));v.setGravity(Gravity.CENTER);v.setPadding(dp(14),dp(5),dp(14),dp(5));v.setBackground(bg(Color.TRANSPARENT,12));v.setFocusable(true);
         v.setOnFocusChangeListener((view,focus)->{v.setBackground(bg(focus?0xCCAE263C:Color.TRANSPARENT,12));if(focus)showControls();});
         v.setOnClickListener(view->{action.run();showControls();});return v;}
     private void add(LinearLayout row,View v,int height){LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-2,dp(height));p.rightMargin=dp(11);row.addView(v,p);}
@@ -28,19 +29,21 @@ public final class PlayerActivity extends Activity {
         Intent i=getIntent();url=i.getStringExtra("url");title=i.getStringExtra("title");animeId=i.getStringExtra("animeId");poster=i.getStringExtra("poster");episode=i.getStringExtra("episode");nextUrl=i.getStringExtra("nextUrl");nextLabel=i.getStringExtra("nextLabel");startPosition=i.getLongExtra("startPosition",0);openingEndMs=i.getLongExtra("openingEndMs",-1);
         if(url==null||!url.startsWith("https://")){Toast.makeText(this,"URL HTTPS inválida",Toast.LENGTH_LONG).show();finish();return;}
         getWindow().getDecorView().setSystemUiVisibility(5894|View.SYSTEM_UI_FLAG_FULLSCREEN|View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN|View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION);
+        screenFit=new ScreenFit(this);
         FrameLayout root=new FrameLayout(this);root.setBackgroundColor(Color.BLACK);setContentView(root);
         video=new PlayerView(this);video.setUseController(false);root.addView(video,new FrameLayout.LayoutParams(-1,-1));
         tap=new View(this);tap.setFocusable(true);tap.setOnClickListener(v->showControls());root.addView(tap,new FrameLayout.LayoutParams(-1,-1));
-        heading=new TextView(this);heading.setText((episode==null?"":episode)+"\n"+(title==null?"Koda Anime":title));heading.setTextColor(WHITE);heading.setTextSize(16);heading.setPadding(dp(30),dp(15),dp(30),dp(15));heading.setBackgroundColor(0x9909090C);
-        root.addView(heading,new FrameLayout.LayoutParams(-1,-2,Gravity.TOP));
-        center=new LinearLayout(this);center.setGravity(Gravity.CENTER);FrameLayout.LayoutParams cp=new FrameLayout.LayoutParams(-1,-2,Gravity.CENTER);root.addView(center,cp);
+        FrameLayout safeControls=new FrameLayout(this);root.addView(safeControls,screenFit.centered());
+        heading=new TextView(this);heading.setText((episode==null?"":episode)+"\n"+(title==null?"Koda Anime":title));heading.setTextColor(WHITE);heading.setTextSize(16*screenFit.textScale(this));heading.setPadding(dp(30),dp(15),dp(30),dp(15));heading.setBackgroundColor(0x9909090C);
+        safeControls.addView(heading,new FrameLayout.LayoutParams(-1,-2,Gravity.TOP));
+        center=new LinearLayout(this);center.setGravity(Gravity.CENTER);FrameLayout.LayoutParams cp=new FrameLayout.LayoutParams(-1,-2,Gravity.CENTER);safeControls.addView(center,cp);
         add(center,control("↶\n10",24,()->seekBy(-10000)),70);
         playPause=control("❚❚",38,()->{if(player==null)return;if(player.isPlaying())player.pause();else player.play();update();});add(center,playPause,70);
         add(center,control("↷\n10",24,()->seekBy(10000)),70);
         bottom=new LinearLayout(this);bottom.setOrientation(1);bottom.setPadding(dp(24),dp(12),dp(24),dp(16));bottom.setBackgroundColor(0xB609090C);
-        FrameLayout.LayoutParams bp=new FrameLayout.LayoutParams(-1,-2,Gravity.BOTTOM);root.addView(bottom,bp);
+        FrameLayout.LayoutParams bp=new FrameLayout.LayoutParams(-1,-2,Gravity.BOTTOM);safeControls.addView(bottom,bp);
         LinearLayout seekRow=new LinearLayout(this);seekRow.setGravity(Gravity.CENTER_VERTICAL);bottom.addView(seekRow,new LinearLayout.LayoutParams(-1,dp(34)));
-        time=new TextView(this);time.setTextColor(WHITE);time.setTextSize(13);time.setText("00:00 / 00:00");seekRow.addView(time);
+        time=new TextView(this);time.setTextColor(WHITE);time.setTextSize(13*screenFit.textScale(this));time.setText("00:00 / 00:00");seekRow.addView(time);
         progress=new SeekBar(this);progress.setProgressTintList(android.content.res.ColorStateList.valueOf(RED));progress.setProgressBackgroundTintList(android.content.res.ColorStateList.valueOf(0xFF77777D));progress.setThumbTintList(android.content.res.ColorStateList.valueOf(RED));
         seekRow.addView(progress,new LinearLayout.LayoutParams(0,dp(34),1));progress.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){
             @Override public void onStartTrackingTouch(SeekBar s){tracking=true;handler.removeCallbacks(hide);}

@@ -16,13 +16,14 @@ public final class MainActivity extends Activity {
     private LinearLayout content,nav; private String page="Início"; private boolean playerOpened; private Anime selectedAnime; private String returnPage="Início",detailFocus=""; private int searchGeneration; private final Map<String,Anime> seen=new LinkedHashMap<>();
     private final ArrayList<TextView> navButtons=new ArrayList<>();
     @Override public void onCreate(Bundle state){super.onCreate(state);getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,WindowManager.LayoutParams.FLAG_FULLSCREEN);showHome();}
-    private float uiScale(){return getResources().getDisplayMetrics().widthPixels/(1000f*getResources().getDisplayMetrics().density);}
+    private ScreenFit screenFit;
+    private float uiScale(){if(screenFit==null)screenFit=new ScreenFit(this);return screenFit.textScale(this);}
     private int dp(float v){return (int)(getResources().getDisplayMetrics().density*uiScale()*v+.5f);}
     private GradientDrawable bg(int color,int radius){GradientDrawable d=new GradientDrawable();d.setColor(color);d.setCornerRadius(dp(radius));return d;}
     private TextView label(String text,int size,int color,boolean bold){TextView t=new TextView(this);t.setText(text);t.setTextSize(size*uiScale());t.setTextColor(color);if(bold)t.setTypeface(null,Typeface.BOLD);return t;}
     private LinearLayout column(){LinearLayout l=new LinearLayout(this);l.setOrientation(1);return l;}
     private void pad(View v,int a,int b,int c,int d){v.setPadding(dp(a),dp(b),dp(c),dp(d));}
-    private void shell(String target){page=target;navButtons.clear();LinearLayout frame=new LinearLayout(this);frame.setBackground(new GradientDrawable(GradientDrawable.Orientation.TR_BL,new int[]{0xFF211015,BLACK,BLACK}));setContentView(frame);
+    private void shell(String target){page=target;navButtons.clear();LinearLayout frame=new LinearLayout(this);frame.setBackground(new GradientDrawable(GradientDrawable.Orientation.TR_BL,new int[]{0xFF211015,BLACK,BLACK}));FrameLayout viewport=new FrameLayout(this);viewport.setBackgroundColor(BLACK);screenFit=new ScreenFit(this);viewport.addView(frame,screenFit.centered());setContentView(viewport);
         nav=column();nav.setBackgroundColor(SIDE);pad(nav,18,23,14,22);frame.addView(nav,new LinearLayout.LayoutParams(dp(190),-1));
         LinearLayout brand=new LinearLayout(this);brand.setGravity(Gravity.CENTER_VERTICAL);
         ImageView mark=new ImageView(this);mark.setImageResource(com.koda.anime.R.mipmap.ic_launcher);brand.addView(mark,new LinearLayout.LayoutParams(dp(36),dp(36)));

@@ -1,4 +1,4 @@
-# Koda Anime TV — versão de teste 0.7
+# Koda Anime TV — versão de teste 0.8
 
 Projeto Android TV e celular em Java. Visual preto/branco/vermelho inspirado em `design/referencia-aprovada.png` (a imagem é apenas referência; a interface é nativa e interativa). Navegação com D-pad, catálogo, pesquisa com filtros, favoritos, histórico local, retomada, player e vinculação Google por código.
 
@@ -33,3 +33,7 @@ Crie em seu projeto Google Cloud um OAuth client do tipo **TVs e dispositivos co
 ## Atualização 0.7
 
 Home com proporções baseadas na referência aprovada, ícones desenhados e foco vermelho. Catálogo mundial Kitsu navegável por popularidade e busca, com paginação de 20 em 20 sem limite fixo no app; fornece informações, não vídeos. Recomendações, recentes e temporadas sem os limites artificiais anteriores. Mais categorias e quatro cards por linha na pesquisa. Compilação validada pelo workflow Koda Anime TV APK; aparência e controle remoto ainda precisam ser validados no aparelho.
+
+## Atualização 0.8
+
+Ajuste automático pela largura e altura disponíveis, mantendo proporção 16:9. Margens de segurança de 3% por lado em TV/TV Box sem touchscreen e 1% em celulares. Interface centralizada; textos e controles do player usam a mesma escala. Vídeo continua preenchendo a área do player, respeitando a proporção original. Não identifica polegadas físicas. Recalcula ao recriar a tela por alteração de configuração.
