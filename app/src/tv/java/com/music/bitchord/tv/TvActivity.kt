@@ -321,6 +321,7 @@ private fun FullPlayer(
     val current = visible.indexOfLast { it.timeMs <= positionMs }.coerceAtLeast(0)
     BoxWithConstraints(Modifier.fillMaxSize().background(palette.background)) {
         val artSize = (maxHeight * .31f).coerceIn(100.dp, 260.dp)
+        val artColumnWidth = (maxWidth * .28f).coerceAtLeast(artSize)
         AsyncImage(song.artworkAt(360), null, Modifier.fillMaxSize(),
             contentScale = ContentScale.Crop, alpha = .25f)
         Box(Modifier.fillMaxSize().background(Brush.horizontalGradient(listOf(
@@ -334,7 +335,7 @@ private fun FullPlayer(
             Spacer(Modifier.height(10.dp))
             Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(30.dp)) {
-                Column(Modifier.width((maxWidth * .28f).coerceAtLeast(artSize))) {
+                Column(Modifier.width(artColumnWidth)) {
                     AsyncImage(song.artworkAt(480), null,
                         Modifier.size(artSize).clip(RoundedCornerShape(14.dp)), contentScale = ContentScale.Crop)
                     Spacer(Modifier.height(8.dp))
