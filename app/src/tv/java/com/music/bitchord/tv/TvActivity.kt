@@ -27,7 +27,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -70,6 +70,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import com.music.bitchord.R
 import com.music.bitchord.data.model.SearchResult
+import com.music.bitchord.data.model.MoodGenre
 import com.music.bitchord.data.model.ShelfItem
 import com.music.bitchord.data.model.Song
 import com.music.bitchord.data.model.UiState
@@ -104,10 +105,14 @@ private fun TvApp(model: MainViewModel) {
     val player = rememberPlayerState(controller)
     val home by model.home.collectAsStateWithLifecycle()
     val results by model.results.collectAsStateWithLifecycle()
+    val explore by model.explore.collectAsStateWithLifecycle()
+    val moodShelves by model.moodGenreShelves.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
     var page by remember { mutableStateOf("Início") }
     var fullPlayer by remember { mutableStateOf(false) }
     var search by remember { mutableStateOf("") }
+    var selectedMood by remember { mutableStateOf<MoodGenre?>(null) }
+    LaunchedEffect(page) { if (page == "Explorar" && explore !is UiState.Success) model.loadExplore() }
     val goPlay: (Song) -> Unit = { song -> controller?.let { scope.launch { it.playSongs(listOf(song), 0) } } }
     val goPlayItem: (ShelfItem) -> Unit = { item ->
         when {
@@ -121,6 +126,10 @@ private fun TvApp(model: MainViewModel) {
     }
 
     BackHandler(fullPlayer) { fullPlayer = false }
+    BackHandler(!fullPlayer && page == "Explorar" && selectedMood != null) {
+        selectedMood = null
+        model.closeMoodGenre()
+    }
     MaterialTheme {
         if (fullPlayer && player.song != null) {
             FullPlayer(model, player.song!!, player.position.positionMs, player.durationMs,
@@ -168,6 +177,60 @@ private fun TvApp(model: MainViewModel) {
                             }
                         }
                     }
+                    "Explorar" -> {
+                        LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                            val mood = selectedMood
+                            if (mood == null) {
+                                item {
+                                    Text("Explorar", color = Color.White, fontSize = 29.sp, fontWeight = FontWeight.Bold)
+                                    Text("Encontre música para cada momento", color = Color(0xFFBBABC9), fontSize = 14.sp)
+                                }
+                                when (val state = explore) {
+                                    is UiState.Success -> items(state.data) { section ->
+                                        Text(section.title, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                                        Spacer(Modifier.height(9.dp))
+                                        section.items.chunked(3).forEach { group ->
+                                            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                                group.forEach { genre ->
+                                                    GenreCard(genre, Modifier.weight(1f)) {
+                                                        selectedMood = genre
+                                                        model.openMoodGenre(genre)
+                                                    }
+                                                }
+                                                repeat(3 - group.size) { Spacer(Modifier.weight(1f)) }
+                                            }
+                                            Spacer(Modifier.height(10.dp))
+                                        }
+                                    }
+                                    is UiState.Error -> item { Text(state.message, color = Color.LightGray) }
+                                    UiState.Loading -> item { Text("Carregando estilos e momentos…", color = Color.LightGray) }
+                                }
+                            } else {
+                                item {
+                                    FocusTile(onClick = { selectedMood = null; model.closeMoodGenre() }) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(Icons.Rounded.ArrowBack, "Voltar", tint = Color.White)
+                                            Spacer(Modifier.width(8.dp))
+                                            Text(mood.title, color = Color.White, fontSize = 25.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                }
+                                when (val state = moodShelves) {
+                                    is UiState.Success -> items(state.data) { shelf ->
+                                        Text(shelf.title, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                                        Spacer(Modifier.height(8.dp))
+                                        LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                            items(shelf.items.filter { it.videoId != null || it.browseId != null }.take(14)) { item ->
+                                                CoverCard(item) { goPlayItem(item) }
+                                            }
+                                        }
+                                    }
+                                    is UiState.Error -> item { Text(state.message, color = Color.LightGray) }
+                                    UiState.Loading -> item { Text("Abrindo ${mood.title}…", color = Color.LightGray) }
+                                }
+                            }
+                        }
+                    }
                     "Biblioteca" -> Box(Modifier.weight(1f)) {
                         Placeholder("Sua biblioteca", "Entre na sua conta pelo celular para sincronizar suas músicas. A integração da biblioteca na TV está em preparação.")
                     }
@@ -178,7 +241,7 @@ private fun TvApp(model: MainViewModel) {
                                     val featured = state.data.asSequence().flatMap { it.items.asSequence() }
                                         .firstOrNull { it.videoId != null || it.browseId != null }
                                     if (featured != null) item {
-                                        HeroCard(featured, page == "Explorar") {
+                                        HeroCard(featured) {
                                             goPlayItem(featured)
                                         }
                                     }
@@ -204,31 +267,31 @@ private fun TvApp(model: MainViewModel) {
                 player.song?.let { song ->
                     Spacer(Modifier.height(8.dp))
                     Row(
-                        Modifier.fillMaxWidth().height(62.dp).clip(RoundedCornerShape(17.dp))
-                            .background(panel).border(1.dp, Color(0xFF3B2852), RoundedCornerShape(17.dp))
-                            .padding(horizontal = 12.dp),
+                        Modifier.fillMaxWidth().height(52.dp).clip(RoundedCornerShape(16.dp))
+                            .background(Color(0xE3171024)).border(1.dp, Color(0xFF4A3063), RoundedCornerShape(16.dp))
+                            .padding(horizontal = 10.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        AsyncImage(song.artworkAt(120), null, Modifier.size(43.dp).clip(RoundedCornerShape(9.dp)), contentScale = ContentScale.Crop)
-                        Spacer(Modifier.width(10.dp))
-                        Column(Modifier.weight(1f).clickable { fullPlayer = true }) {
+                        AsyncImage(song.artworkAt(120), null, Modifier.size(38.dp).clip(RoundedCornerShape(8.dp)), contentScale = ContentScale.Crop)
+                        Spacer(Modifier.width(9.dp))
+                        Column(Modifier.weight(1.1f).clickable { fullPlayer = true }) {
                             Text(song.title, maxLines = 1, overflow = TextOverflow.Ellipsis, color = Color.White,
                                 fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                            Text(song.artist, maxLines = 1, color = Color(0xFFBBAFC9), fontSize = 12.sp)
+                            Text(song.artist, maxLines = 1, color = Color(0xFFBBAFC9), fontSize = 11.sp)
                         }
-                        TvIconButton(Icons.Rounded.SkipPrevious, "Anterior") { controller?.seekToPreviousMediaItem() }
+                        TvIconButton(Icons.Rounded.SkipPrevious, "Anterior", size = 34.dp) { controller?.seekToPreviousMediaItem() }
                         TvIconButton(if (player.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                            if (player.isPlaying) "Pausar" else "Reproduzir", selected = true) {
+                            if (player.isPlaying) "Pausar" else "Reproduzir", selected = true, size = 38.dp) {
                             controller?.let { if (it.isPlaying) it.pause() else it.play() }
                         }
-                        TvIconButton(Icons.Rounded.SkipNext, "Próxima") { controller?.seekToNextMediaItem() }
-                        Spacer(Modifier.width(12.dp))
+                        TvIconButton(Icons.Rounded.SkipNext, "Próxima", size = 34.dp) { controller?.seekToNextMediaItem() }
+                        Spacer(Modifier.width(8.dp))
                         Text(formatTime(player.position.positionMs), color = Color.LightGray, fontSize = 11.sp)
                         Spacer(Modifier.width(7.dp))
-                        ProgressTrack(player.position.positionMs, player.durationMs, Modifier.weight(.45f))
+                        ProgressTrack(player.position.positionMs, player.durationMs, Modifier.weight(.55f))
                         Spacer(Modifier.width(7.dp))
                         Text(formatTime(player.durationMs), color = Color.LightGray, fontSize = 11.sp)
-                        TvIconButton(Icons.Rounded.Fullscreen, "Tela cheia e letras") { fullPlayer = true }
+                        TvIconButton(Icons.Rounded.Fullscreen, "Tela cheia e letras", size = 34.dp) { fullPlayer = true }
                     }
                 }
             }
@@ -256,16 +319,12 @@ private fun FullPlayer(
     }
     val visible = lyrics.orEmpty().filter { !it.isGap }
     val current = visible.indexOfLast { it.timeMs <= positionMs }.coerceAtLeast(0)
-    val scroll = rememberLazyListState()
-    LaunchedEffect(song.videoId, current) {
-        if (current > 1) scroll.animateScrollToItem(current - 1)
-    }
     BoxWithConstraints(Modifier.fillMaxSize().background(palette.background)) {
         val artSize = (maxHeight * .31f).coerceIn(100.dp, 260.dp)
-        AsyncImage(song.artworkAt(600), null, Modifier.fillMaxSize(),
-            contentScale = ContentScale.Crop, alpha = .58f)
+        AsyncImage(song.artworkAt(360), null, Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop, alpha = .25f)
         Box(Modifier.fillMaxSize().background(Brush.horizontalGradient(listOf(
-            Color(0xB9080610), Color(0xBE080610), Color(0xD7080610)))))
+            Color(0xD9080610), Color(0xC7080610), Color(0xE6080610)))))
         Column(Modifier.fillMaxSize().padding(horizontal = 30.dp, vertical = 18.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 androidx.compose.foundation.Image(painterResource(R.drawable.koda_mark), "Koda Music", Modifier.size(36.dp))
@@ -275,12 +334,12 @@ private fun FullPlayer(
             Spacer(Modifier.height(10.dp))
             Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(30.dp)) {
-                Column(Modifier.width(artSize + 12.dp)) {
+                Column(Modifier.width((maxWidth * .28f).coerceAtLeast(artSize))) {
                     AsyncImage(song.artworkAt(480), null,
                         Modifier.size(artSize).clip(RoundedCornerShape(14.dp)), contentScale = ContentScale.Crop)
                     Spacer(Modifier.height(8.dp))
                     Text(song.title, color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold,
-                        maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        maxLines = 2, overflow = TextOverflow.Ellipsis)
                     Text(song.artist, color = Color(0xFFCCBDD8), fontSize = 14.sp,
                         maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
@@ -289,12 +348,15 @@ private fun FullPlayer(
                         Text(if (checked) "Letras indisponíveis para esta música" else "Buscando letras…",
                             color = Color(0xFFD3C4DA), fontSize = 22.sp)
                     } else {
-                        LazyColumn(state = scroll, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            items(visible.size) { index ->
-                                Text(visible[index].text,
-                                    color = if (index == current) Color.White else Color(0xFF95879F),
-                                    fontSize = if (index == current) 26.sp else 20.sp,
-                                    fontWeight = if (index == current) FontWeight.Bold else FontWeight.Medium)
+                        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            for (offset in -2..2) {
+                                val line = visible.getOrNull(current + offset)
+                                Text(line?.text.orEmpty(),
+                                    color = if (offset == 0) Color.White else Color(0xFF9E90AB),
+                                    fontSize = if (offset == 0) 26.sp else 20.sp,
+                                    fontWeight = if (offset == 0) FontWeight.Bold else FontWeight.Medium,
+                                    maxLines = 2, overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.height(48.dp))
                             }
                         }
                     }
@@ -347,7 +409,24 @@ private fun TvIconButton(icon: ImageVector, label: String, selected: Boolean = f
 }
 
 @Composable
-private fun HeroCard(item: ShelfItem, explore: Boolean, onPlay: () -> Unit) {
+private fun GenreCard(item: MoodGenre, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    var focused by remember { mutableStateOf(false) }
+    val shape = RoundedCornerShape(15.dp)
+    Box(modifier.height(100.dp).onFocusChanged { focused = it.isFocused }
+        .clip(shape).background(Color(0xFF241436))
+        .then(if (focused) Modifier.border(2.dp, Color(0xFFC993FF), shape) else Modifier)
+        .clickable(onClick = onClick)) {
+        AsyncImage(item.thumbnailUrl, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop, alpha = .83f)
+        Box(Modifier.fillMaxSize().background(Brush.horizontalGradient(listOf(
+            Color(0xEE130B1D), Color(0x77130B1D), Color.Transparent))))
+        Text(item.title, color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold,
+            maxLines = 2, overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.align(Alignment.BottomStart).padding(14.dp))
+    }
+}
+
+@Composable
+private fun HeroCard(item: ShelfItem, onPlay: () -> Unit) {
     val shape = RoundedCornerShape(18.dp)
     Box(Modifier.fillMaxWidth().height(178.dp).clip(shape).background(panel)) {
         AsyncImage(item.thumbnailUrl, null, Modifier.fillMaxWidth(.62f).fillMaxHeight()
@@ -356,7 +435,7 @@ private fun HeroCard(item: ShelfItem, explore: Boolean, onPlay: () -> Unit) {
             Color(0xFA0D071B), Color(0xC50D071B), Color(0x220D071B)))))
         Column(Modifier.fillMaxHeight().fillMaxWidth(.72f).padding(20.dp),
             verticalArrangement = Arrangement.Center) {
-            Text(if (explore) "EXPLORE NO KODA" else "KODA MUSIC", color = Color(0xFFC478FF),
+            Text("KODA MUSIC", color = Color(0xFFC478FF),
                 fontSize = 11.sp, fontWeight = FontWeight.Bold)
             Text(item.title, color = Color.White, fontSize = 29.sp, fontWeight = FontWeight.ExtraBold,
                 maxLines = 1, overflow = TextOverflow.Ellipsis)
