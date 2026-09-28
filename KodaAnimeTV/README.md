@@ -12,7 +12,7 @@ Instale em Android TV/Google TV/Mi Stick (Android TV OS). Telas Samsung Tizen e 
 
 ## Como testar
 
-1. Início carrega recomendações (`Jikan /v4/top/anime`) e lançamentos (`/v4/seasons/now`); pesquisa e categorias usam `/v4/anime`.
+1. Início carrega recomendações (`Jikan /v4/top/anime`) e episódios recentes diretamente do catálogo público de `animestvs.org` (dublados e recentes). Abra um card recente e toque **Assistir agora** para testar um episódio no player. Se as duas listas falharem, os lançamentos voltam ao Jikan sem vídeo. Pesquisa e categorias usam `/v4/anime`.
 2. Abra **Configurações > Verificar player**. Big Buck Bunny é um vídeo demonstrativo; confirme play/pause, voltar/avançar 10 segundos, qualidade e pular abertura (+90 segundos quando não houver marcação). Você também pode informar uma URL HTTPS autorizada de MP4/HLS. A lista de resoluções aparece apenas quando o vídeo tem múltiplas faixas; MP4 único mantém a qualidade original.
 3. Em **Configurações**, informe URL HTTPS de instâncias próprias/permitidas dos projetos `api-animesonline-cc` e/ou `SugoiAPI`. Sem URLs, o app não tenta obter episódios. Abra um anime e selecione **Buscar episódios nas fontes**. A fonte 1 tenta listar episódios e resolve o selecionado; a fonte 2 tenta o episódio 1. URLs MP4/HLS reconhecidas são passadas ao Media3. Os repositórios não fornecem um serviço hospedado estável; se retornarem outros campos, ajuste `Sources.java`. Não inclua credenciais/segredos das fontes no app.
 4. Favoritos são locais ao aparelho e separados pelo ID da conta Google vinculada. Vincular Google **não transfere a conta do Super Animes nem sincroniza favoritos entre TVs**.
@@ -25,7 +25,7 @@ Crie em seu projeto Google Cloud um OAuth client do tipo **TVs e dispositivos co
 
 ## Limitações desta versão
 
-- Catálogo Jikan fornece metadados/capas, não vídeo. A disponibilidade de episódios depende das instâncias configuradas e das permissões de uso do conteúdo.
+- Os episódios recentes do serviço público podem ser reproduzidos diretamente quando os links estiverem ativos; recomendações e pesquisa do Jikan fornecem metadados/capas, mas exigem uma fonte de episódios. A disponibilidade depende das fontes e das permissões de uso do conteúdo.
 - Nenhum servidor externo de episódios pôde ser testado a partir deste ambiente. As integrações são adaptadores iniciais que podem precisar de ajuste ao JSON real. Login Google real depende das credenciais do projeto do usuário e também não foi testado aqui.
 - A tela inicial é fiel à estrutura aprovada, mas usa capas dinâmicas dos animes retornados pelo catálogo. A imagem de referência contém títulos fictícios.
 - O vídeo de teste Big Buck Bunny é do Blender Foundation, publicado em licença Creative Commons Attribution 3.0.

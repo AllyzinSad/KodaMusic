@@ -20,16 +20,6 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
-      - name: Probe public anime catalog
-        run: |
-          for url in "https://animestvs.org/animes-dublados" "https://animestvs.org/episodios-recentes-dublados" "https://animestvs.org/episodios-recentes" "https://animestvs.org/animes-legendados" "https://animestvs.org/animes/1"; do
-            echo "PROBE $url"
-            curl -L --max-time 12 -sS -o /tmp/koda-response -w 'STATUS=%{http_code} TYPE=%{content_type} SIZE=%{size_download}\n' "$url" || true
-            head -c 320 /tmp/koda-response 2>/dev/null || true
-            echo
-          done
-          echo "VIDEO_HEAD"
-          curl -L -I --max-time 12 -sS -o /dev/null -w 'STATUS=%{http_code} TYPE=%{content_type} SIZE=%{size_download}\n' 'https://cdn.animestvs.org/dublados/like/770206.mp4' || true
       - run: gradle -p KodaAnimeTV :app:assembleDebug --stacktrace
       - uses: actions/upload-artifact@v4
         with:

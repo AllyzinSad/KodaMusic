@@ -80,15 +80,16 @@ public final class MainActivity extends Activity {
     private Set<String> favorites(){return new HashSet<>(getSharedPreferences("favorites",0).getStringSet(favKey(),new HashSet<>()));}
     private boolean isFavorite(Anime a){return favorites().contains(a.id);}
     private void toggleFavorite(Anime a){Set<String> ids=favorites();if(!ids.add(a.id))ids.remove(a.id);
-        getSharedPreferences("favorites",0).edit().putStringSet(favKey(),ids).putString("item_"+a.id,a.title+"\n"+a.poster+"\n"+a.genre).apply();}
+        getSharedPreferences("favorites",0).edit().putStringSet(favKey(),ids).putString("item_"+a.id,a.title+"\n"+a.poster+"\n"+a.genre+"\n"+a.playUrl).apply();}
     private void showFavorites(){shell("Favoritos");content.addView(label("Minha lista",30,WHITE,true));heading("Animes salvos");LinearLayout list=row();
         Set<String> ids=favorites();if(ids.isEmpty()){list.addView(label("Seus favoritos aparecem aqui.",18,MUTED,false));return;}
-        for(String id:ids){Anime a=seen.get(id);if(a==null){String[] bits=getSharedPreferences("favorites",0).getString("item_"+id,"Anime\n\n").split("\n",-1);a=new Anime(id,bits[0],bits.length>1?bits[1]:"","",bits.length>2?bits[2]:"",0);}list.addView(card(a,true));}
+        for(String id:ids){Anime a=seen.get(id);if(a==null){String[] bits=getSharedPreferences("favorites",0).getString("item_"+id,"Anime\n\n").split("\n",-1);a=new Anime(id,bits[0],bits.length>1?bits[1]:"","",bits.length>2?bits[2]:"",0,bits.length>3?bits[3]:"");}list.addView(card(a,true));}
     }
     private void details(Anime a){LinearLayout box=column();pad(box,30,12,30,12);TextView text=label(a.description.isEmpty()?"Escolha uma fonte de episódios para testar a reprodução.":a.description,16,WHITE,false);box.addView(text);
         TextView info=label("\n"+a.genre+(a.episodes>0?" · "+a.episodes+" episódios":""),14,MUTED,false);box.addView(info);
         AlertDialog dialog=new AlertDialog.Builder(this).setTitle(a.title).setView(box).setNegativeButton("Fechar",null).create();
         box.addView(button(isFavorite(a)?"♥ Remover dos favoritos":"♡ Adicionar aos favoritos",()->{toggleFavorite(a);dialog.dismiss();if(page.equals("Favoritos"))showFavorites();}));
+        if(!a.playUrl.isEmpty())box.addView(button("▶ Assistir agora",()->{dialog.dismiss();play(a.playUrl,a.title+" · "+a.description);}));
         box.addView(button("▶ Buscar episódios nas fontes",()->{dialog.dismiss();loadEpisodes(a);}));dialog.show();
     }
     private void loadEpisodes(Anime a){AlertDialog loading=new AlertDialog.Builder(this).setMessage("Consultando fontes de episódios...").setCancelable(true).create();loading.show();

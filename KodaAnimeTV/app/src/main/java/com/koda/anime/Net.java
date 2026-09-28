@@ -6,6 +6,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.widget.ImageView;
 import org.json.JSONObject;
+import org.json.JSONArray;
 import java.io.*;
 import java.net.*;
 import java.nio.charset.StandardCharsets;
@@ -18,6 +19,10 @@ final class Net {
     static final Handler UI = new Handler(Looper.getMainLooper());
     static void json(String url, Done<JSONObject> done) { WORK.execute(() -> {
         try { JSONObject value = new JSONObject(request(url, null)); UI.post(() -> done.accept(value, null)); }
+        catch (Exception e) { UI.post(() -> done.accept(null, e)); }
+    }); }
+    static void jsonArray(String url, Done<JSONArray> done) { WORK.execute(() -> {
+        try { JSONArray value = new JSONArray(request(url, null)); UI.post(() -> done.accept(value, null)); }
         catch (Exception e) { UI.post(() -> done.accept(null, e)); }
     }); }
     static void post(String url, String body, Done<JSONObject> done) { WORK.execute(() -> {
