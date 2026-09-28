@@ -8,10 +8,12 @@ import android.content.Context;
 import android.content.Intent;
 import android.database.Cursor;
 import android.graphics.Color;
+import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.OpenableColumns;
 import android.view.Gravity;
+import android.view.View;
 import android.widget.*;
 
 import org.json.JSONArray;
@@ -30,7 +32,7 @@ public class MainActivity extends Activity {
   final int BG=Color.rgb(10,10,10), PANEL=Color.rgb(24,24,24), FIELD=Color.rgb(36,36,36);
   final int GOLD=Color.rgb(212,175,55), TEXT=Color.rgb(245,245,245), MUTED=Color.rgb(165,165,165);
 
-  TextView scriptStatus, renderStatus;
+  TextView scriptStatus, renderStatus, projectStats;
   ProgressBar renderProgress;
   Button renderButton, cancelRenderButton, openVideoButton;
   RenderEngine renderEngine;
@@ -47,103 +49,160 @@ public class MainActivity extends Activity {
 
   ScrollView ui(){
     ScrollView s=new ScrollView(this);
+    s.setFillViewport(true);
     s.setBackgroundColor(BG);
 
     LinearLayout r=new LinearLayout(this);
     r.setOrientation(LinearLayout.VERTICAL);
-    r.setPadding(dp(18),dp(18),dp(18),dp(28));
+    r.setPadding(dp(16),dp(18),dp(16),dp(30));
     r.setBackgroundColor(BG);
     s.addView(r);
 
-    r.addView(t("Koda Cut",28,true,TEXT));
-    TextView badge=t("ANDROID • BETA 0.5 DYNAMIC",12,true,GOLD);
-    badge.setPadding(0,dp(2),0,dp(14));
-    r.addView(badge);
+    LinearLayout top=new LinearLayout(this);
+    top.setOrientation(LinearLayout.HORIZONTAL);
+    top.setGravity(Gravity.CENTER_VERTICAL);
 
+    LinearLayout brand=new LinearLayout(this);
+    brand.setOrientation(LinearLayout.VERTICAL);
+    brand.setLayoutParams(new LinearLayout.LayoutParams(0,-2,1));
+    brand.addView(t("Koda Cut",30,true,TEXT));
+    TextView subtitle=t("AI VIDEO STUDIO",11,true,GOLD);
+    subtitle.setLetterSpacing(0.12f);
+    brand.addView(subtitle);
+    top.addView(brand);
+
+    TextView badge=t("BETA 0.6",11,true,Color.BLACK);
+    badge.setGravity(Gravity.CENTER);
+    badge.setPadding(dp(12),dp(7),dp(12),dp(7));
+    badge.setBackground(roundBg(GOLD,GOLD,18));
+    top.addView(badge);
+
+    r.addView(top);
+
+    LinearLayout hero=card();
+    TextView heroTitle=t("Edição simples por fora. Poderosa por dentro.",18,true,TEXT);
+    hero.addView(heroTitle);
     TextView intro=t(
-      "Motor de edição local: composição, reenquadramento, legendas dinâmicas e mixagem. A IA planeja; o Koda Cut executa.",
-      14,false,MUTED
+      "1  Adicione a mídia   →   2  Converse com a IA   →   3  Renderize",
+      13,false,MUTED
     );
-    intro.setPadding(0,0,0,dp(16));
-    r.addView(intro);
+    intro.setPadding(0,dp(8),0,0);
+    hero.addView(intro);
 
-    sector(r,"main","VÍDEO PRINCIPAL","Adicionar vídeo","video/*",VIDEO,false);
-    sector(r,"images","IMAGENS / PNGs","Adicionar imagens","image/*",IMAGES,true);
-    sector(r,"sfx","EFEITOS SONOROS","Adicionar efeitos","audio/*",SFX,true);
-    sector(r,"music","MÚSICAS","Adicionar músicas","audio/*",MUSIC,true);
-    sector(r,"broll","B-ROLL","Adicionar B-roll","video/*",BROLL,true);
+    projectStats=t("Projeto vazio",12,true,GOLD);
+    projectStats.setPadding(0,dp(12),0,0);
+    hero.addView(projectStats);
+    rootAdd(r,hero,18);
 
-    LinearLayout fontCard=new LinearLayout(this);
-    fontCard.setOrientation(LinearLayout.VERTICAL);
-    fontCard.setPadding(dp(14),dp(14),dp(14),dp(14));
-    fontCard.setBackgroundColor(PANEL);
-    fontCard.addView(t("PACK DE FONTES",15,true,TEXT));
-    TextView fonts=t(
-      "font:anton — Impacto forte / títulos\n"+
-      "font:bebas_neue — Títulos altos / shorts\n"+
-      "font:montserrat — Clean / profissional\n"+
-      "font:poppins — Moderno / legendas\n"+
-      "font:oswald — Destaque / esportivo\n"+
-      "font:bangers — Meme / quadrinhos",
-      12,false,MUTED
-    );
-    fonts.setPadding(0,dp(8),0,0);
-    fontCard.addView(fonts);
-    rootAdd(r,fontCard,12);
+    addSectionLabel(r,"01","MÍDIA DO PROJETO","Tudo que a IA pode usar na edição.");
+    LinearLayout media=plainGroup();
+    sector(media,"main","Vídeo principal","Base da edição","Adicionar vídeo","video/*",VIDEO,false,true);
+    sector(media,"images","Imagens / PNGs","Memes, stickers, logos e overlays","Adicionar imagens","image/*",IMAGES,true,false);
+    sector(media,"sfx","Efeitos sonoros","Memes, impactos, whooshes e reações","Adicionar SFX","audio/*",SFX,true,false);
+    sector(media,"music","Músicas","Trilha de fundo e músicas","Adicionar música","audio/*",MUSIC,true,false);
+    sector(media,"broll","B-roll","Vídeos extras e apoio visual","Adicionar B-roll","video/*",BROLL,true,false);
+    r.addView(media);
 
-    Button copy=btn("COPIAR MAPA PARA IA",true);
+    addSectionLabel(r,"02","DIRETOR IA","Envie o mapa, converse com o ChatGPT e traga o KodaScript.");
+    LinearLayout ai=card();
+
+    Button copy=btn("Copiar mapa para a IA",true);
     copy.setOnClickListener(v->copyProject());
-    r.addView(copy,lp(12));
+    ai.addView(copy);
 
-    Button share=btn("COMPARTILHAR PROJETO",false);
+    Button share=btn("Compartilhar projeto",false);
     share.setOnClickListener(v->shareProject());
-    r.addView(share,lp(8));
+    ai.addView(share,lp(8));
 
-    Button paste=btn("COLAR KODASCRIPT",true);
+    Button paste=btn("Colar KodaScript",true);
     paste.setOnClickListener(v->pasteKodaScript());
-    r.addView(paste,lp(16));
+    ai.addView(paste,lp(12));
 
     scriptStatus=t("Nenhum KodaScript carregado.",13,false,MUTED);
-    scriptStatus.setPadding(dp(4),dp(8),dp(4),dp(4));
-    r.addView(scriptStatus);
+    scriptStatus.setPadding(dp(12),dp(12),dp(12),dp(12));
+    scriptStatus.setBackground(roundBg(FIELD,Color.rgb(58,58,58),14));
+    ai.addView(scriptStatus,lp(10));
 
-    Button review=btn("VER RESUMO DO KODASCRIPT",false);
+    Button review=btn("Ver resumo da edição",false);
     review.setOnClickListener(v->reviewCurrentScript());
-    r.addView(review,lp(8));
+    ai.addView(review,lp(8));
+    r.addView(ai);
 
-    renderButton=btn("RENDERIZAR VÍDEO",true);
+    addSectionLabel(r,"03","FERRAMENTAS DO MOTOR","Recursos que o KodaScript pode combinar.");
+    LinearLayout tools=card();
+    tools.addView(toolGridRow("Canvas & formato","Camadas de vídeo"));
+    tools.addView(toolGridRow("Crop & posição","Zoom & reenquadramento"),lp(8));
+    tools.addView(toolGridRow("Legenda dinâmica","Texto estilizado"),lp(8));
+    tools.addView(toolGridRow("SFX & música","Fade de áudio"),lp(8));
+    tools.addView(toolGridRow("PNG & overlays","Fontes"),lp(8));
+
+    Button fontsToggle=btn("Ver pack de fontes",false);
+    TextView fonts=t(
+      "Anton  •  Bebas Neue  •  Montserrat\n"+
+      "Poppins SemiBold  •  Oswald  •  Bangers",
+      12,false,MUTED
+    );
+    fonts.setPadding(dp(6),dp(10),dp(6),dp(4));
+    fonts.setVisibility(View.GONE);
+    fontsToggle.setOnClickListener(v->{
+      boolean show=fonts.getVisibility()!=View.VISIBLE;
+      fonts.setVisibility(show?View.VISIBLE:View.GONE);
+      fontsToggle.setText(show?"Ocultar pack de fontes":"Ver pack de fontes");
+    });
+    tools.addView(fontsToggle,lp(12));
+    tools.addView(fonts);
+    r.addView(tools);
+
+    addSectionLabel(r,"04","RENDER","Finalize e salve o vídeo no aparelho.");
+    LinearLayout render=card();
+
+    renderButton=btn("Renderizar vídeo",true);
     renderButton.setOnClickListener(v->startRender());
-    r.addView(renderButton,lp(18));
+    render.addView(renderButton);
 
     renderProgress=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);
     renderProgress.setMax(100);
     renderProgress.setProgress(0);
-    r.addView(renderProgress,lp(10));
+    render.addView(renderProgress,lp(12));
 
     renderStatus=t("Aguardando render.",13,false,MUTED);
-    renderStatus.setPadding(dp(4),dp(6),dp(4),dp(4));
-    r.addView(renderStatus);
+    renderStatus.setPadding(dp(2),dp(8),dp(2),dp(4));
+    render.addView(renderStatus);
 
-    cancelRenderButton=btn("CANCELAR RENDER",false);
+    LinearLayout renderActions=new LinearLayout(this);
+    renderActions.setOrientation(LinearLayout.HORIZONTAL);
+
+    cancelRenderButton=btn("Cancelar",false);
     cancelRenderButton.setEnabled(false);
     cancelRenderButton.setOnClickListener(v->cancelRender());
-    r.addView(cancelRenderButton,lp(8));
+    LinearLayout.LayoutParams halfA=new LinearLayout.LayoutParams(0,-2,1);
+    halfA.setMarginEnd(dp(4));
+    renderActions.addView(cancelRenderButton,halfA);
 
-    openVideoButton=btn("ABRIR / ASSISTIR VÍDEO",false);
+    openVideoButton=btn("Assistir vídeo",false);
     openVideoButton.setEnabled(false);
     openVideoButton.setOnClickListener(v->openLastVideo());
-    r.addView(openVideoButton,lp(8));
+    LinearLayout.LayoutParams halfB=new LinearLayout.LayoutParams(0,-2,1);
+    halfB.setMarginStart(dp(4));
+    renderActions.addView(openVideoButton,halfB);
 
-    Button clearScript=btn("REMOVER KODASCRIPT",false);
+    render.addView(renderActions,lp(10));
+    r.addView(render);
+
+    addSectionLabel(r,"05","PROJETO","Ações de manutenção.");
+    LinearLayout maintenance=card();
+
+    Button clearScript=btn("Remover KodaScript",false);
     clearScript.setOnClickListener(v->{
       currentScript="";
       getSharedPreferences(PREFS,0).edit().remove(KEY_SCRIPT).apply();
       refreshScriptStatus();
+      refreshProjectStats();
       toast("KodaScript removido.");
     });
-    r.addView(clearScript,lp(8));
+    maintenance.addView(clearScript);
 
-    Button clear=btn("LIMPAR PROJETO",false);
+    Button clear=dangerBtn("Limpar projeto");
     clear.setOnClickListener(v->new AlertDialog.Builder(this)
       .setTitle("Limpar projeto?")
       .setMessage("Isso remove os arquivos cadastrados e o KodaScript salvo neste beta.")
@@ -154,39 +213,73 @@ public class MainActivity extends Activity {
         getSharedPreferences(PREFS,0).edit().clear().apply();
         refresh();
         refreshScriptStatus();
+        refreshProjectStats();
         toast("Projeto limpo.");
       }).show());
-    r.addView(clear,lp(14));
+    maintenance.addView(clear,lp(8));
+    r.addView(maintenance);
 
     TextView foot=t(
-      "Beta 0.5: legendas estilizadas por palavra, canvas cover/contain, posições precisas e fades de áudio.",
-      12,false,MUTED
+      "Koda Cut Beta 0.6 Studio UI • motor local de edição por KodaScript",
+      11,false,Color.rgb(110,110,110)
     );
-    foot.setPadding(0,dp(18),0,0);
+    foot.setGravity(Gravity.CENTER);
+    foot.setPadding(0,dp(22),0,0);
     r.addView(foot);
 
     return s;
   }
 
-  void sector(LinearLayout root,String key,String title,String label,String mime,int req,boolean multi){
+  void sector(
+    LinearLayout root,
+    String key,
+    String title,
+    String description,
+    String label,
+    String mime,
+    int req,
+    boolean multi,
+    boolean expanded
+  ){
     LinearLayout c=new LinearLayout(this);
     c.setOrientation(LinearLayout.VERTICAL);
-    c.setPadding(dp(14),dp(14),dp(14),dp(14));
-    c.setBackgroundColor(PANEL);
+    c.setPadding(dp(14),dp(13),dp(14),dp(13));
+    c.setBackground(roundBg(PANEL,Color.rgb(48,48,48),16));
 
-    c.addView(t(title,15,true,TEXT));
+    LinearLayout heading=new LinearLayout(this);
+    heading.setOrientation(LinearLayout.HORIZONTAL);
+    heading.setGravity(Gravity.CENTER_VERTICAL);
+
+    LinearLayout copy=new LinearLayout(this);
+    copy.setOrientation(LinearLayout.VERTICAL);
+    copy.setLayoutParams(new LinearLayout.LayoutParams(0,-2,1));
+    copy.addView(t(title,14,true,TEXT));
+    TextView desc=t(description,11,false,MUTED);
+    desc.setPadding(0,dp(2),0,0);
+    copy.addView(desc);
+    heading.addView(copy);
+
+    Button add=smallBtn("+ Adicionar");
+    add.setOnClickListener(v->pick(mime,req,multi));
+    heading.addView(add);
+    c.addView(heading);
 
     LinearLayout l=new LinearLayout(this);
     l.setOrientation(LinearLayout.VERTICAL);
-    l.setPadding(0,dp(8),0,dp(8));
+    l.setPadding(0,dp(10),0,dp(4));
+    l.setVisibility(expanded?View.VISIBLE:View.GONE);
     c.addView(l);
     lists.put(key,l);
 
-    Button b=btn("+ "+label,false);
-    b.setOnClickListener(v->pick(mime,req,multi));
-    c.addView(b);
+    Button toggle=ghostBtn(expanded?"Ocultar arquivos":"Ver arquivos");
+    toggle.setOnClickListener(v->{
+      boolean show=l.getVisibility()!=View.VISIBLE;
+      l.setVisibility(show?View.VISIBLE:View.GONE);
+      toggle.setText(show?"Ocultar arquivos":"Ver arquivos");
+    });
+    c.addView(toggle,lp(8));
 
-    root.addView(c,lp(12));
+    root.addView(c,lp(10));
   }
 
   void pick(String mime,int req,boolean multi){
@@ -298,6 +391,7 @@ public class MainActivity extends Activity {
 
       if(!any)l.addView(t("Nenhum arquivo adicionado.",12,false,MUTED));
     }
+    refreshProjectStats();
   }
 
   String projectPrompt(){
@@ -636,6 +730,7 @@ public class MainActivity extends Activity {
   }
 
   void refreshScriptStatus(){
+    refreshProjectStats();
     if(scriptStatus==null)return;
 
     if(currentScript==null||currentScript.isBlank()){
@@ -844,6 +939,79 @@ public class MainActivity extends Activity {
       .show();
   }
 
+  void addSectionLabel(LinearLayout root,String number,String title,String subtitle){
+    LinearLayout row=new LinearLayout(this);
+    row.setOrientation(LinearLayout.HORIZONTAL);
+    row.setGravity(Gravity.TOP);
+    row.setPadding(0,dp(22),0,dp(9));
+
+    TextView n=t(number,11,true,GOLD);
+    n.setGravity(Gravity.CENTER);
+    n.setPadding(dp(8),dp(5),dp(8),dp(5));
+    n.setBackground(roundBg(Color.rgb(38,33,15),Color.rgb(95,78,24),10));
+    row.addView(n);
+
+    LinearLayout copy=new LinearLayout(this);
+    copy.setOrientation(LinearLayout.VERTICAL);
+    LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(0,-2,1);
+    cp.setMarginStart(dp(10));
+    copy.setLayoutParams(cp);
+    copy.addView(t(title,15,true,TEXT));
+    TextView sub=t(subtitle,11,false,MUTED);
+    sub.setPadding(0,dp(2),0,0);
+    copy.addView(sub);
+    row.addView(copy);
+
+    root.addView(row);
+  }
+
+  LinearLayout plainGroup(){
+    LinearLayout l=new LinearLayout(this);
+    l.setOrientation(LinearLayout.VERTICAL);
+    return l;
+  }
+
+  LinearLayout card(){
+    LinearLayout c=new LinearLayout(this);
+    c.setOrientation(LinearLayout.VERTICAL);
+    c.setPadding(dp(15),dp(15),dp(15),dp(15));
+    c.setBackground(roundBg(PANEL,Color.rgb(48,48,48),18));
+    return c;
+  }
+
+  LinearLayout toolGridRow(String left,String right){
+    LinearLayout row=new LinearLayout(this);
+    row.setOrientation(LinearLayout.HORIZONTAL);
+
+    TextView a=toolChip(left);
+    TextView b=toolChip(right);
+
+    LinearLayout.LayoutParams pa=new LinearLayout.LayoutParams(0,-2,1);
+    pa.setMarginEnd(dp(4));
+    LinearLayout.LayoutParams pb=new LinearLayout.LayoutParams(0,-2,1);
+    pb.setMarginStart(dp(4));
+
+    row.addView(a,pa);
+    row.addView(b,pb);
+    return row;
+  }
+
+  TextView toolChip(String value){
+    TextView v=t(value,12,true,TEXT);
+    v.setGravity(Gravity.CENTER);
+    v.setPadding(dp(8),dp(11),dp(8),dp(11));
+    v.setBackground(roundBg(FIELD,Color.rgb(62,62,62),13));
+    return v;
+  }
+
+  GradientDrawable roundBg(int fill,int stroke,int radiusDp){
+    GradientDrawable d=new GradientDrawable();
+    d.setColor(fill);
+    d.setCornerRadius(dp(radiusDp));
+    if(stroke!=fill)d.setStroke(dp(1),stroke);
+    return d;
+  }
+
   void rootAdd(LinearLayout root,LinearLayout child,int top){
     root.addView(child,lp(top));
   }
@@ -852,10 +1020,54 @@ public class MainActivity extends Activity {
     Button b=new Button(this);
     b.setText(s);
     b.setAllCaps(false);
-    b.setTextSize(12);
+    b.setTextSize(13);
+    b.setMinHeight(dp(48));
     b.setTextColor(primary?Color.BLACK:TEXT);
-    b.setBackgroundColor(primary?GOLD:FIELD);
+    b.setBackground(roundBg(primary?GOLD:FIELD,primary?GOLD:Color.rgb(66,66,66),14));
     return b;
+  }
+
+  Button smallBtn(String s){
+    Button b=btn(s,false);
+    b.setTextSize(11);
+    b.setMinHeight(dp(40));
+    b.setPadding(dp(12),0,dp(12),0);
+    return b;
+  }
+
+  Button ghostBtn(String s){
+    Button b=new Button(this);
+    b.setText(s);
+    b.setAllCaps(false);
+    b.setTextSize(11);
+    b.setMinHeight(dp(38));
+    b.setTextColor(MUTED);
+    b.setBackground(roundBg(Color.rgb(28,28,28),Color.rgb(48,48,48),12));
+    return b;
+  }
+
+  Button dangerBtn(String s){
+    Button b=btn(s,false);
+    b.setTextColor(Color.rgb(255,145,145));
+    b.setBackground(roundBg(Color.rgb(45,22,22),Color.rgb(95,42,42),14));
+    return b;
+  }
+
+  void refreshProjectStats(){
+    if(projectStats==null)return;
+    int images=0,sfx=0,music=0,broll=0,main=0;
+    for(Asset a:assets){
+      if("main".equals(a.sector))main++;
+      else if("images".equals(a.sector))images++;
+      else if("sfx".equals(a.sector))sfx++;
+      else if("music".equals(a.sector))music++;
+      else if("broll".equals(a.sector))broll++;
+    }
+    int total=images+sfx+music+broll;
+    String script=(currentScript!=null&&!currentScript.isBlank())?"KodaScript carregado":"sem KodaScript";
+    projectStats.setText(
+      (main>0?"Vídeo pronto":"Sem vídeo")+"  •  "+total+" assets  •  "+script
+    );
   }
 
   TextView t(String s,int size,boolean bold,int color){
