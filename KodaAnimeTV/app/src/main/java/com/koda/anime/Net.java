@@ -17,14 +17,36 @@ final class Net {
     interface Done<T> { void accept(T value, Exception error); }
     static final ExecutorService WORK = Executors.newFixedThreadPool(4);
     static final Handler UI = new Handler(Looper.getMainLooper());
-    static void json(String url, Done<JSONObject> done) { WORK.execute(() -> {
-        try { JSONObject value = new JSONObject(request(url, null)); UI.post(() -> done.accept(value, null)); }
-        catch (Exception e) { UI.post(() -> done.accept(null, e)); }
-    }); }
-    static void jsonArray(String url, Done<JSONArray> done) { WORK.execute(() -> {
-        try { JSONArray value = new JSONArray(request(url, null)); UI.post(() -> done.accept(value, null)); }
-        catch (Exception e) { UI.post(() -> done.accept(null, e)); }
-    }); }
+    private static final java.util.concurrent.ThreadPoolExecutor IMAGES = new java.util.concurrent.ThreadPoolExecutor(3,3,0L,java.util.concurrent.TimeUnit.MILLISECONDS,new java.util.concurrent.LinkedBlockingQueue<Runnable>(120),new java.util.concurrent.ThreadPoolExecutor.DiscardOldestPolicy());
+    private static final android.util.LruCache<String,Bitmap> IMAGE_CACHE = new android.util.LruCache<String,Bitmap>(8*1024*1024){@Override protected int sizeOf(String key,Bitmap value){return value.getByteCount();}};
+    private static final java.util.Map<String,Pending> PENDING = new java.util.HashMap<>();
+    private static final java.util.LinkedHashMap<String,Cached> CACHE = new java.util.LinkedHashMap<>();
+    private static final class Cached { Object value; long time; Cached(Object v){value=v;time=System.currentTimeMillis();} }
+    private static final class Pending { java.util.List<Done<Object>> callbacks=new java.util.ArrayList<>(); Runnable timeout; java.util.concurrent.Future<?> work; }
+    static void clearImageQueue(){IMAGES.getQueue().clear();}
+    static void json(String url, Done<JSONObject> done){get(url,false,(v,e)->done.accept((JSONObject)v,e));}
+    static void jsonArray(String url, Done<JSONArray> done){get(url,true,(v,e)->done.accept((JSONArray)v,e));}
+    private static synchronized void get(String url,boolean array,Done<Object> done){
+        String key=(array?"array:":"object:")+url;
+        Cached cached=CACHE.get(key);
+        if(cached!=null && System.currentTimeMillis()-cached.time<300000){UI.post(()->done.accept(cached.value,null));return;}
+        Pending existing=PENDING.get(key);
+        if(existing!=null){existing.callbacks.add(done);return;}
+        Pending pending=new Pending();pending.callbacks.add(done);PENDING.put(key,pending);
+        pending.timeout=()->{finish(key,pending,null,new IOException("A conexão demorou demais. Tente novamente."));if(pending.work!=null)pending.work.cancel(true);};
+        UI.postDelayed(pending.timeout,35000);
+        pending.work=WORK.submit(()->{
+            try {String body=request(url,null);Object value=array?new JSONArray(body):new JSONObject(body);UI.post(()->finish(key,pending,value,null));}
+            catch(Exception error){UI.post(()->finish(key,pending,null,error));}
+        });
+    }
+    private static synchronized void finish(String key,Pending pending,Object value,Exception error){
+        if(PENDING.get(key)!=pending)return;
+        PENDING.remove(key);UI.removeCallbacks(pending.timeout);
+        if(value!=null){CACHE.put(key,new Cached(value));while(CACHE.size()>8)CACHE.remove(CACHE.keySet().iterator().next());}
+        for(Done<Object> callback:pending.callbacks)callback.accept(value,error);
+        pending.callbacks.clear();
+    }
     static void post(String url, String body, Done<JSONObject> done) { WORK.execute(() -> {
         try { JSONObject value = new JSONObject(request(url, body)); UI.post(() -> done.accept(value, null)); }
         catch (Exception e) { UI.post(() -> done.accept(null, e)); }
@@ -55,9 +77,10 @@ final class Net {
     static void image(String url, ImageView view) {
         if (url == null || !url.startsWith("https://")) return;
         view.setTag(url);
-        WORK.execute(() -> { try {
+        Bitmap cached=IMAGE_CACHE.get(url);if(cached!=null){view.setImageBitmap(cached);return;}
+        IMAGES.execute(() -> { try {
             HttpURLConnection c=(HttpURLConnection)new URL(url).openConnection(); c.setConnectTimeout(7000); c.setReadTimeout(8000);
-            try(InputStream in=c.getInputStream()) { Bitmap b=BitmapFactory.decodeStream(in); UI.post(() -> {if(url.equals(view.getTag()) && b!=null) view.setImageBitmap(b);}); }
+            try(InputStream in=c.getInputStream()) { BitmapFactory.Options opts=new BitmapFactory.Options();opts.inSampleSize=2;Bitmap b=BitmapFactory.decodeStream(in,null,opts);if(b!=null)IMAGE_CACHE.put(url,b); UI.post(() -> {if(url.equals(view.getTag()) && b!=null) view.setImageBitmap(b);}); }
             finally { c.disconnect(); }
         } catch(Exception ignored) {} });
     }

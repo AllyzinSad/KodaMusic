@@ -16,6 +16,7 @@ public final class MainActivity extends Activity {
     private LinearLayout content,nav; private String page="Início"; private boolean playerOpened; private Anime selectedAnime; private String returnPage="Início",detailFocus=""; private int searchGeneration; private final Map<String,Anime> seen=new LinkedHashMap<>();
     private final ArrayList<TextView> navButtons=new ArrayList<>();
     @Override public void onCreate(Bundle state){super.onCreate(state);getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,WindowManager.LayoutParams.FLAG_FULLSCREEN);showHome();}
+    private int screenGeneration;
     private ScreenFit screenFit;
     private float uiScale(){if(screenFit==null)screenFit=new ScreenFit(this);return screenFit.textScale(this);}
     private int dp(float v){return (int)(getResources().getDisplayMetrics().density*uiScale()*v+.5f);}
@@ -23,7 +24,7 @@ public final class MainActivity extends Activity {
     private TextView label(String text,int size,int color,boolean bold){TextView t=new TextView(this);t.setText(text);t.setTextSize(size*uiScale());t.setTextColor(color);if(bold)t.setTypeface(null,Typeface.BOLD);return t;}
     private LinearLayout column(){LinearLayout l=new LinearLayout(this);l.setOrientation(1);return l;}
     private void pad(View v,int a,int b,int c,int d){v.setPadding(dp(a),dp(b),dp(c),dp(d));}
-    private void shell(String target){page=target;navButtons.clear();LinearLayout frame=new LinearLayout(this);frame.setBackground(new GradientDrawable(GradientDrawable.Orientation.TR_BL,new int[]{0xFF211015,BLACK,BLACK}));FrameLayout viewport=new FrameLayout(this);viewport.setBackgroundColor(BLACK);screenFit=new ScreenFit(this);viewport.addView(frame,screenFit.centered());setContentView(viewport);
+    private void shell(String target){screenGeneration++;Net.clearImageQueue();page=target;navButtons.clear();LinearLayout frame=new LinearLayout(this);frame.setBackground(new GradientDrawable(GradientDrawable.Orientation.TR_BL,new int[]{0xFF211015,BLACK,BLACK}));FrameLayout viewport=new FrameLayout(this);viewport.setBackgroundColor(BLACK);screenFit=new ScreenFit(this);viewport.addView(frame,screenFit.centered());setContentView(viewport);
         nav=column();nav.setBackgroundColor(SIDE);pad(nav,18,23,14,22);frame.addView(nav,new LinearLayout.LayoutParams(dp(190),-1));
         LinearLayout brand=new LinearLayout(this);brand.setGravity(Gravity.CENTER_VERTICAL);
         ImageView mark=new ImageView(this);mark.setImageResource(com.koda.anime.R.mipmap.ic_launcher);brand.addView(mark,new LinearLayout.LayoutParams(dp(36),dp(36)));
@@ -43,11 +44,11 @@ public final class MainActivity extends Activity {
     }
     private GradientDrawable outline(int fill,int stroke,int radius,int width){GradientDrawable d=bg(fill,radius);d.setStroke(dp(width),stroke);return d;}
     private TextView heading(String title){TextView t=label(title,20,WHITE,true);LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,-2);p.topMargin=dp(25);p.bottomMargin=dp(10);content.addView(t,p);return t;}
-    private void showHome(){shell("Início");content.addView(label("Descubra sua próxima história",21,MUTED,false));
+    private void showHome(){shell("Início");final int generation=screenGeneration;content.addView(label("Descubra sua próxima história",21,MUTED,false));
         heading("Recomendados para você");LinearLayout recommended=row();TextView status=label("Carregando recomendações...",16,MUTED,false);recommended.addView(status);
-        Catalog.recommendations((list,error)->{recommended.removeAllViews();if(error!=null){recommended.addView(label("Catálogo indisponível: "+error,16,MUTED,false));return;}cards(recommended,list,true);});
+        Catalog.recommendations((list,error)->{if(generation!=screenGeneration)return;recommended.removeAllViews();if(error!=null){recommended.addView(button("Tentar carregar recomendações novamente",this::showHome));return;}cards(recommended,list,true);});
         heading("Lançados recentemente");LinearLayout recent=row();recent.addView(label("Carregando lançamentos...",16,MUTED,false));
-        Net.UI.postDelayed(()->Catalog.recent((list,error)->{if(!"Início".equals(page))return;recent.removeAllViews();if(error!=null){recent.addView(label("Não foi possível carregar lançamentos.",16,MUTED,false));return;}cards(recent,list,false);}),500);
+        Catalog.recent((list,error)->{if(generation!=screenGeneration)return;recent.removeAllViews();if(error!=null){recent.addView(button("Tentar carregar lançamentos novamente",this::showHome));return;}cards(recent,list,false);});
         List<WatchHistory.Entry> history=WatchHistory.all(this);if(!history.isEmpty()){
             heading("Continuar assistindo");LinearLayout continueRow=row();HashSet<String> shown=new HashSet<>();
             for(WatchHistory.Entry e:history){if(e.watched()||!shown.add(e.animeId)||shown.size()>12)continue;

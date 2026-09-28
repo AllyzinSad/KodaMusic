@@ -22,7 +22,7 @@ final class Catalog {
                     j.optString("episodio","Episódio recente"),j.optString("tipo","Anime"),0,video));
             }
             if(!playable.isEmpty())callback.accept(playable,null);
-            else get("https://api.jikan.moe/v4/seasons/now?limit=12",callback);
+            else callback.accept(playable,error==null?"Nenhum lançamento disponível.":error.getMessage());
         });
     }
     static Anime fromSource(JSONObject j){
