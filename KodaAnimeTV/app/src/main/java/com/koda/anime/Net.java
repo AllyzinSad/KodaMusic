@@ -43,12 +43,12 @@ final class Net {
     }); }
     static String request(String url, String body) throws Exception {
         URL u = new URL(url); if (!"https".equalsIgnoreCase(u.getProtocol())) throw new IOException("Configure uma URL HTTPS.");
-        HttpURLConnection c = (HttpURLConnection) u.openConnection(); c.setConnectTimeout(9000); c.setReadTimeout(12000);
-        c.setRequestProperty("User-Agent", "KodaAnimeTV/0.1 (Android TV)");
+        HttpURLConnection c = (HttpURLConnection) u.openConnection(); c.setConnectTimeout(10000); c.setReadTimeout(25000);
+        c.setRequestProperty("User-Agent", "KodaAnimeTV/0.4 (Android)");
         if (body != null) { c.setRequestMethod("POST"); c.setDoOutput(true); c.setRequestProperty("Content-Type", "application/x-www-form-urlencoded"); try(OutputStream out=c.getOutputStream()){out.write(body.getBytes(StandardCharsets.UTF_8));} }
         InputStream in = c.getResponseCode() < 400 ? c.getInputStream() : c.getErrorStream();
         if (in == null) throw new IOException("HTTP " + c.getResponseCode());
-        try (InputStream stream=in; ByteArrayOutputStream bytes=new ByteArrayOutputStream()) { byte[] b=new byte[8192]; int n; while((n=stream.read(b))!=-1) {bytes.write(b,0,n); if(bytes.size()>2_000_000) throw new IOException("Resposta muito grande");} return bytes.toString("UTF-8"); }
+        try (InputStream stream=in; ByteArrayOutputStream bytes=new ByteArrayOutputStream()) { byte[] b=new byte[8192]; int n; while((n=stream.read(b))!=-1) {bytes.write(b,0,n); if(bytes.size()>8_000_000) throw new IOException("Resposta muito grande");} return bytes.toString("UTF-8"); }
         finally { c.disconnect(); }
     }
     static String enc(String s) { try { return URLEncoder.encode(s, "UTF-8"); } catch(Exception e){return s;} }
