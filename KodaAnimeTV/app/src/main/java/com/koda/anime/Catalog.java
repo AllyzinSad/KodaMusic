@@ -8,13 +8,13 @@ final class Catalog {
     private static JSONArray cachedAll; private static long cacheTime;
     static void recommendations(Result callback) { Net.jsonArray("https://animestvs.org/animes-famosos",(a,e)->{
         if(e!=null){callback.accept(Collections.emptyList(),e.getMessage());return;}
-        ArrayList<Anime> list=new ArrayList<>();if(a!=null)for(int i=0;i<Math.min(a.length(),12);i++){JSONObject j=a.optJSONObject(i);if(j!=null)list.add(fromSource(j));}
+        ArrayList<Anime> list=new ArrayList<>();if(a!=null)for(int i=0;i<a.length();i++){JSONObject j=a.optJSONObject(i);if(j!=null)list.add(fromSource(j));}
         callback.accept(list,null);
     }); }
     static void recent(Result callback) {
         Net.jsonArray("https://animestvs.org/episodios-recentes",(items,error)->{
             ArrayList<Anime> playable=new ArrayList<>();Set<String> ids=new HashSet<>();
-            if(error==null && items!=null)for(int i=0;i<Math.min(items.length(),30);i++){
+            if(error==null && items!=null)for(int i=0;i<items.length();i++){
                 JSONObject j=items.optJSONObject(i);if(j==null)continue;
                 String video=j.optString("link_video","");String id=j.optString("id","");
                 if(!video.startsWith("https://")||id.isEmpty()||!ids.add(id))continue;
@@ -40,8 +40,11 @@ final class Catalog {
         });
     }
     static void kitsuSearch(String query,Result callback){
-        if(query.trim().isEmpty()){callback.accept(Collections.emptyList(),null);return;}
-        Net.json("https://kitsu.io/api/edge/anime?filter%5Btext%5D="+Net.enc(query)+"&page%5Blimit%5D=12",(json,error)->{
+        kitsuPage(query,0,callback);
+    }
+    static void kitsuPage(String query,int offset,Result callback){
+        String filter=query.trim().isEmpty()?"sort=popularityRank":"filter%5Btext%5D="+Net.enc(query);
+        Net.json("https://kitsu.io/api/edge/anime?"+filter+"&page%5Blimit%5D=20&page%5Boffset%5D="+offset,(json,error)->{
             if(error!=null||json==null){callback.accept(Collections.emptyList(),error==null?"Fonte indisponível":error.getMessage());return;}
             ArrayList<Anime> list=new ArrayList<>();JSONArray data=json.optJSONArray("data");
             if(data!=null)for(int i=0;i<data.length();i++){JSONObject o=data.optJSONObject(i);if(o==null)continue;JSONObject attr=o.optJSONObject("attributes");if(attr==null)continue;
@@ -59,7 +62,7 @@ final class Catalog {
     }
     private static List<Anime> relatedFilter(JSONArray data,Anime current){
         ArrayList<Anime> list=new ArrayList<>();String key=franchiseKey(current.title);
-        if(data!=null && key.length()>7)for(int i=0;i<data.length() && list.size()<24;i++){
+        if(data!=null && key.length()>7)for(int i=0;i<data.length();i++){
             JSONObject j=data.optJSONObject(i);if(j!=null && key.equals(franchiseKey(j.optString("titulo"))))list.add(fromSource(j));
         }
         boolean hasCurrent=false;for(Anime item:list)if(item.title.equalsIgnoreCase(current.title))hasCurrent=true;

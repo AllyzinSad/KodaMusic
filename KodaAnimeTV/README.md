@@ -1,4 +1,4 @@
-# Koda Anime TV — versão de teste 0.6
+# Koda Anime TV — versão de teste 0.7
 
 Projeto Android TV e celular em Java. Visual preto/branco/vermelho inspirado em `design/referencia-aprovada.png` (a imagem é apenas referência; a interface é nativa e interativa). Navegação com D-pad, catálogo, pesquisa com filtros, favoritos, histórico local, retomada, player e vinculação Google por código.
 
@@ -29,3 +29,7 @@ Crie em seu projeto Google Cloud um OAuth client do tipo **TVs e dispositivos co
 - Nenhum servidor externo de episódios pôde ser testado a partir deste ambiente. As integrações são adaptadores iniciais que podem precisar de ajuste ao JSON real. Login Google real depende das credenciais do projeto do usuário e também não foi testado aqui.
 - A tela inicial é fiel à estrutura aprovada, mas usa capas dinâmicas dos animes retornados pelo catálogo. A imagem de referência contém títulos fictícios.
 - O vídeo de teste Big Buck Bunny é do Blender Foundation, publicado em licença Creative Commons Attribution 3.0.
+
+## Atualização 0.7
+
+Home com proporções baseadas na referência aprovada, ícones desenhados e foco vermelho. Catálogo mundial Kitsu navegável por popularidade e busca, com paginação de 20 em 20 sem limite fixo no app; fornece informações, não vídeos. Recomendações, recentes e temporadas sem os limites artificiais anteriores. Mais categorias e quatro cards por linha na pesquisa. Compilação validada pelo workflow Koda Anime TV APK; aparência e controle remoto ainda precisam ser validados no aparelho.
