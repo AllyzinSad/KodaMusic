@@ -109,6 +109,16 @@ private fun TvApp(model: MainViewModel) {
     var fullPlayer by remember { mutableStateOf(false) }
     var search by remember { mutableStateOf("") }
     val goPlay: (Song) -> Unit = { song -> controller?.let { scope.launch { it.playSongs(listOf(song), 0) } } }
+    val goPlayItem: (ShelfItem) -> Unit = { item ->
+        when {
+            item.videoId != null -> goPlay(Song(item.videoId, item.title, item.subtitle, item.thumbnailUrl))
+            item.browseId != null -> model.collectSongs(item.browseId, item.thumbnailUrl) { result ->
+                result.onSuccess { songs ->
+                    if (songs.isNotEmpty()) controller?.let { scope.launch { it.playSongs(songs, 0) } }
+                }
+            }
+        }
+    }
 
     BackHandler(fullPlayer) { fullPlayer = false }
     MaterialTheme {
@@ -122,8 +132,8 @@ private fun TvApp(model: MainViewModel) {
         }
         Row(Modifier.fillMaxSize().background(canvas)) {
             Column(
-                Modifier.width(76.dp).fillMaxHeight()
-                    .background(Color(0xFF0D0919)).padding(horizontal = 12.dp, vertical = 22.dp),
+                Modifier.width(68.dp).fillMaxHeight()
+                    .background(Color(0xFF0D0919)).padding(horizontal = 9.dp, vertical = 22.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
@@ -131,7 +141,7 @@ private fun TvApp(model: MainViewModel) {
                 Spacer(Modifier.height(18.dp))
                 listOf("Início" to Icons.Rounded.Home, "Explorar" to Icons.Rounded.Explore,
                     "Buscar" to Icons.Rounded.Search, "Biblioteca" to Icons.Rounded.LibraryMusic).forEach { (label, symbol) ->
-                    TvIconButton(symbol, label, selected = page == label, size = 50.dp) { page = label }
+                    TvIconButton(symbol, label, selected = page == label, size = 48.dp) { page = label }
                 }
             }
             Column(Modifier.weight(1f).fillMaxHeight().padding(start = 22.dp, end = 22.dp, top = 18.dp, bottom = 14.dp)) {
@@ -166,22 +176,20 @@ private fun TvApp(model: MainViewModel) {
                             when (val state = home) {
                                 is UiState.Success -> {
                                     val featured = state.data.asSequence().flatMap { it.items.asSequence() }
-                                        .firstOrNull { it.videoId != null }
+                                        .firstOrNull { it.videoId != null || it.browseId != null }
                                     if (featured != null) item {
                                         HeroCard(featured, page == "Explorar") {
-                                            goPlay(Song(featured.videoId!!, featured.title, featured.subtitle, featured.thumbnailUrl))
+                                            goPlayItem(featured)
                                         }
                                     }
                                     items(state.data) { shelf ->
-                                    val playable = shelf.items.filter { it.videoId != null }.take(14)
-                                    if (playable.isNotEmpty()) {
+                                    val cards = shelf.items.filter { it.videoId != null || it.browseId != null }.take(14)
+                                    if (cards.isNotEmpty()) {
                                         Text(shelf.title, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
                                         Spacer(Modifier.height(8.dp))
                                         LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                            items(playable) { item ->
-                                                CoverCard(item) {
-                                                    goPlay(Song(item.videoId!!, item.title, item.subtitle, item.thumbnailUrl))
-                                                }
+                                            items(cards) { item ->
+                                                CoverCard(item) { goPlayItem(item) }
                                             }
                                         }
                                     }
@@ -253,11 +261,11 @@ private fun FullPlayer(
         if (current > 1) scroll.animateScrollToItem(current - 1)
     }
     BoxWithConstraints(Modifier.fillMaxSize().background(palette.background)) {
-        val artSize = (maxHeight * .48f).coerceIn(150.dp, 300.dp)
+        val artSize = (maxHeight * .31f).coerceIn(100.dp, 260.dp)
         AsyncImage(song.artworkAt(600), null, Modifier.fillMaxSize(),
-            contentScale = ContentScale.Crop, alpha = .28f)
+            contentScale = ContentScale.Crop, alpha = .58f)
         Box(Modifier.fillMaxSize().background(Brush.horizontalGradient(listOf(
-            Color(0xE8080610), Color(0xD9080610), Color(0xEE080610)))))
+            Color(0xB9080610), Color(0xBE080610), Color(0xD7080610)))))
         Column(Modifier.fillMaxSize().padding(horizontal = 30.dp, vertical = 18.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 androidx.compose.foundation.Image(painterResource(R.drawable.koda_mark), "Koda Music", Modifier.size(36.dp))
@@ -330,8 +338,8 @@ private fun TvIconButton(icon: ImageVector, label: String, selected: Boolean = f
     var focused by remember { mutableStateOf(false) }
     val shape = RoundedCornerShape(13.dp)
     Box(Modifier.size(size).onFocusChanged { focused = it.isFocused }.clip(shape)
-        .background(if (selected || focused) Color(0xFF6B2BAA) else Color.Transparent)
-        .border(if (focused) 2.dp else 0.dp, Color(0xFFC993FF), shape)
+        .background(if (selected) Color(0xFF6B2BAA) else if (focused) Color(0xFF452661) else Color.Transparent)
+        .then(if (focused) Modifier.border(2.dp, Color(0xFFC993FF), shape) else Modifier)
         .clickable(onClick = onClick), contentAlignment = Alignment.Center) {
         Icon(icon, contentDescription = label, tint = if (selected || focused) Color.White else Color(0xFFD4C3E7),
             modifier = Modifier.size(if (size > 45.dp) 26.dp else 23.dp))
@@ -376,7 +384,8 @@ private fun CoverCard(item: ShelfItem, onClick: () -> Unit) {
     var focused by remember { mutableStateOf(false) }
     val shape = RoundedCornerShape(14.dp)
     Column(Modifier.width(132.dp).onFocusChanged { focused = it.isFocused }
-        .clip(shape).border(if (focused) 2.dp else 0.dp, violet, shape).clickable(onClick = onClick).padding(2.dp)) {
+        .clip(shape).then(if (focused) Modifier.border(2.dp, violet, shape) else Modifier)
+        .clickable(onClick = onClick).padding(2.dp)) {
         Box(Modifier.size(128.dp).clip(RoundedCornerShape(11.dp)).background(panel)) {
             AsyncImage(item.thumbnailUrl, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
         }
