@@ -78,9 +78,11 @@ import com.music.bitchord.data.model.artworkAt
 import com.music.bitchord.playback.playSongs
 import com.music.bitchord.playback.rememberMediaController
 import com.music.bitchord.playback.rememberPlayerState
+import com.music.bitchord.data.innertube.StreamResolver
 import com.music.bitchord.ui.MainViewModel
 import com.music.bitchord.ui.theme.rememberArtworkPalette
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 
 private val canvas = Color(0xFF080610)
 private val panel = Color(0xFF181124)
@@ -114,6 +116,14 @@ private fun TvApp(model: MainViewModel) {
     var selectedMood by remember { mutableStateOf<MoodGenre?>(null) }
     LaunchedEffect(page) { if (page == "Explorar" && explore !is UiState.Success) model.loadExplore() }
     val goPlay: (Song) -> Unit = { song -> controller?.let { scope.launch { it.playSongs(listOf(song), 0) } } }
+    // Resolve the highlighted track while the viewer is deciding what to play.
+    // The resolver keeps a short-lived URL cache, so the play tap can skip that network walk.
+    var focusedVideoId by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(focusedVideoId) {
+        val id = focusedVideoId ?: return@LaunchedEffect
+        delay(350)
+        runCatching { StreamResolver.resolve(id) }
+    }
     val goPlayItem: (ShelfItem) -> Unit = { item ->
         when {
             item.videoId != null -> goPlay(Song(item.videoId, item.title, item.subtitle, item.thumbnailUrl))
@@ -126,6 +136,12 @@ private fun TvApp(model: MainViewModel) {
     }
 
     BackHandler(fullPlayer) { fullPlayer = false }
+    val activity = androidx.compose.ui.platform.LocalContext.current as? TvActivity
+    BackHandler(!fullPlayer && page == "Início") {
+        controller?.stop()
+        controller?.clearMediaItems()
+        activity?.finish()
+    }
     BackHandler(!fullPlayer && page == "Explorar" && selectedMood != null) {
         selectedMood = null
         model.closeMoodGenre()
@@ -139,7 +155,8 @@ private fun TvApp(model: MainViewModel) {
                 onNext = { controller?.seekToNextMediaItem() })
             return@MaterialTheme
         }
-        Row(Modifier.fillMaxSize().background(canvas)) {
+        Box(Modifier.fillMaxSize().background(canvas)) {
+        Row(Modifier.fillMaxSize()) {
             Column(
                 Modifier.width(68.dp).fillMaxHeight()
                     .background(Color(0xFF0D0919)).padding(horizontal = 9.dp, vertical = 22.dp),
@@ -153,7 +170,8 @@ private fun TvApp(model: MainViewModel) {
                     TvIconButton(symbol, label, selected = page == label, size = 48.dp) { page = label }
                 }
             }
-            Column(Modifier.weight(1f).fillMaxHeight().padding(start = 22.dp, end = 22.dp, top = 18.dp, bottom = 14.dp)) {
+            Column(Modifier.weight(1f).fillMaxHeight().padding(start = 22.dp, end = 22.dp, top = 0.dp,
+                bottom = if (player.song != null) 62.dp else 14.dp)) {
                 when (page) {
                     "Buscar" -> {
                         Text("Buscar músicas", color = Color.White, fontSize = 29.sp, fontWeight = FontWeight.Bold)
@@ -235,24 +253,25 @@ private fun TvApp(model: MainViewModel) {
                         Placeholder("Sua biblioteca", "Entre na sua conta pelo celular para sincronizar suas músicas. A integração da biblioteca na TV está em preparação.")
                     }
                     else -> {
-                        LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(18.dp)) {
+                        LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             when (val state = home) {
                                 is UiState.Success -> {
                                     val featured = state.data.asSequence().flatMap { it.items.asSequence() }
-                                        .firstOrNull { it.videoId != null || it.browseId != null }
+                                        .firstOrNull { it.videoId != null && !it.thumbnailUrl.isNullOrBlank() }
                                     if (featured != null) item {
-                                        HeroCard(featured) {
+                                        HeroCard(featured, onFocus = { focusedVideoId = featured.videoId }) {
                                             goPlayItem(featured)
                                         }
                                     }
                                     items(state.data) { shelf ->
-                                    val cards = shelf.items.filter { it.videoId != null || it.browseId != null }.take(14)
+                                    val cards = shelf.items.filter { (it.videoId != null || it.browseId != null) &&
+                                        !it.thumbnailUrl.isNullOrBlank() && it != featured }.take(14)
                                     if (cards.isNotEmpty()) {
                                         Text(shelf.title, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
                                         Spacer(Modifier.height(8.dp))
                                         LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                                             items(cards) { item ->
-                                                CoverCard(item) { goPlayItem(item) }
+                                                CoverCard(item, onFocus = { focusedVideoId = item.videoId }) { goPlayItem(item) }
                                             }
                                         }
                                     }
@@ -264,37 +283,16 @@ private fun TvApp(model: MainViewModel) {
                         }
                     }
                 }
-                player.song?.let { song ->
-                    Spacer(Modifier.height(8.dp))
-                    Row(
-                        Modifier.fillMaxWidth().height(52.dp).clip(RoundedCornerShape(16.dp))
-                            .background(Color(0xE3171024)).border(1.dp, Color(0xFF4A3063), RoundedCornerShape(16.dp))
-                            .padding(horizontal = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        AsyncImage(song.artworkAt(120), null, Modifier.size(38.dp).clip(RoundedCornerShape(8.dp)), contentScale = ContentScale.Crop)
-                        Spacer(Modifier.width(9.dp))
-                        Column(Modifier.weight(1.1f).clickable { fullPlayer = true }) {
-                            Text(song.title, maxLines = 1, overflow = TextOverflow.Ellipsis, color = Color.White,
-                                fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                            Text(song.artist, maxLines = 1, color = Color(0xFFBBAFC9), fontSize = 11.sp)
-                        }
-                        TvIconButton(Icons.Rounded.SkipPrevious, "Anterior", size = 34.dp) { controller?.seekToPreviousMediaItem() }
-                        TvIconButton(if (player.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                            if (player.isPlaying) "Pausar" else "Reproduzir", selected = true, size = 38.dp) {
-                            controller?.let { if (it.isPlaying) it.pause() else it.play() }
-                        }
-                        TvIconButton(Icons.Rounded.SkipNext, "Próxima", size = 34.dp) { controller?.seekToNextMediaItem() }
-                        Spacer(Modifier.width(8.dp))
-                        Text(formatTime(player.position.positionMs), color = Color.LightGray, fontSize = 11.sp)
-                        Spacer(Modifier.width(7.dp))
-                        ProgressTrack(player.position.positionMs, player.durationMs, Modifier.weight(.55f))
-                        Spacer(Modifier.width(7.dp))
-                        Text(formatTime(player.durationMs), color = Color.LightGray, fontSize = 11.sp)
-                        TvIconButton(Icons.Rounded.Fullscreen, "Tela cheia e letras", size = 34.dp) { fullPlayer = true }
-                    }
-                }
             }
+        }
+        player.song?.let { song ->
+            TvMiniPlayer(song, player.position.positionMs, player.durationMs, player.isPlaying,
+                Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(horizontal = 16.dp, vertical = 9.dp),
+                onOpen = { fullPlayer = true },
+                onPrevious = { controller?.seekToPreviousMediaItem() },
+                onToggle = { controller?.let { if (it.isPlaying) it.pause() else it.play() } },
+                onNext = { controller?.seekToNextMediaItem() })
+        }
         }
     }
 }
@@ -396,6 +394,48 @@ private fun ProgressTrack(positionMs: Long, durationMs: Long, modifier: Modifier
 }
 
 @Composable
+private fun TvMiniPlayer(
+    song: Song, positionMs: Long, durationMs: Long, playing: Boolean,
+    modifier: Modifier = Modifier, onOpen: () -> Unit, onPrevious: () -> Unit,
+    onToggle: () -> Unit, onNext: () -> Unit,
+) {
+    val shape = RoundedCornerShape(13.dp)
+    Row(modifier.height(48.dp).clip(shape).background(Color(0xF0171125))
+        .border(1.dp, Color(0xFF33203F), shape).padding(horizontal = 18.dp),
+        verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.weight(1f).clickable(onClick = onOpen), verticalAlignment = Alignment.CenterVertically) {
+            AsyncImage(song.artworkAt(160), song.title, Modifier.size(37.dp).clip(RoundedCornerShape(7.dp)),
+                contentScale = ContentScale.Crop)
+            Spacer(Modifier.width(12.dp))
+            Column {
+                Text(song.title, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(song.artist, color = Color(0xFFBBAFC9), fontSize = 11.sp,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            TvIconButton(Icons.Rounded.SkipPrevious, "Anterior", size = 33.dp, onClick = onPrevious)
+            Spacer(Modifier.width(7.dp))
+            TvIconButton(if (playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                if (playing) "Pausar" else "Reproduzir", selected = true, size = 37.dp, onClick = onToggle)
+            Spacer(Modifier.width(7.dp))
+            TvIconButton(Icons.Rounded.SkipNext, "Próxima", size = 33.dp, onClick = onNext)
+        }
+        Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.End) {
+            Text(formatTime(positionMs), color = Color(0xFFD7CEDF), fontSize = 11.sp)
+            Spacer(Modifier.width(8.dp))
+            ProgressTrack(positionMs, durationMs, Modifier.weight(1f))
+            Spacer(Modifier.width(8.dp))
+            Text(formatTime(durationMs), color = Color(0xFFD7CEDF), fontSize = 11.sp)
+            Spacer(Modifier.width(12.dp))
+            TvIconButton(Icons.Rounded.Fullscreen, "Tela cheia e letras", size = 32.dp, onClick = onOpen)
+        }
+    }
+}
+
+@Composable
 private fun TvIconButton(icon: ImageVector, label: String, selected: Boolean = false,
     size: androidx.compose.ui.unit.Dp = 42.dp, onClick: () -> Unit) {
     var focused by remember { mutableStateOf(false) }
@@ -427,23 +467,27 @@ private fun GenreCard(item: MoodGenre, modifier: Modifier = Modifier, onClick: (
 }
 
 @Composable
-private fun HeroCard(item: ShelfItem, onPlay: () -> Unit) {
-    val shape = RoundedCornerShape(18.dp)
-    Box(Modifier.fillMaxWidth().height(178.dp).clip(shape).background(panel)) {
-        AsyncImage(item.thumbnailUrl, null, Modifier.fillMaxWidth(.62f).fillMaxHeight()
-            .align(Alignment.CenterEnd), contentScale = ContentScale.Crop, alpha = .78f)
+private fun HeroCard(item: ShelfItem, onFocus: () -> Unit = {}, onPlay: () -> Unit) {
+    Box(Modifier.fillMaxWidth().height(190.dp).background(panel)) {
+        AsyncImage(item.thumbnailUrl, item.title, Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop)
         Box(Modifier.fillMaxSize().background(Brush.horizontalGradient(listOf(
-            Color(0xFA0D071B), Color(0xC50D071B), Color(0x220D071B)))))
-        Column(Modifier.fillMaxHeight().fillMaxWidth(.72f).padding(20.dp),
+            Color(0xFF080610), Color(0xD9080610), Color(0x43080610), Color(0x12080610)))))
+        Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(
+            Color.Transparent, Color.Transparent, canvas))))
+        Column(Modifier.fillMaxHeight().fillMaxWidth(.56f).padding(start = 6.dp, top = 12.dp, bottom = 12.dp),
             verticalArrangement = Arrangement.Center) {
             Text("KODA MUSIC", color = Color(0xFFC478FF),
                 fontSize = 11.sp, fontWeight = FontWeight.Bold)
-            Text(item.title, color = Color.White, fontSize = 29.sp, fontWeight = FontWeight.ExtraBold,
+            Text(item.title, color = Color.White, fontSize = 38.sp, fontWeight = FontWeight.ExtraBold,
+                maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 40.sp)
+            Text(item.subtitle, color = Color(0xFFE0D6E7), fontSize = 18.sp,
                 maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(item.subtitle, color = Color(0xFFE0D6E7), fontSize = 16.sp,
-                maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Spacer(Modifier.height(10.dp))
-            TvButton("▶  Reproduzir", onPlay)
+            Text("Ouça agora no Koda Music.", color = Color(0xFFBCAFCB), fontSize = 12.sp)
+            Spacer(Modifier.height(8.dp))
+            Box(Modifier.onFocusChanged { if (it.isFocused) onFocus() }) {
+                TvButton("▶  Reproduzir", onPlay)
+            }
         }
     }
 }
@@ -460,10 +504,10 @@ private fun FocusTile(selected: Boolean = false, onClick: () -> Unit, content: @
 }
 
 @Composable
-private fun CoverCard(item: ShelfItem, onClick: () -> Unit) {
+private fun CoverCard(item: ShelfItem, onFocus: () -> Unit = {}, onClick: () -> Unit) {
     var focused by remember { mutableStateOf(false) }
     val shape = RoundedCornerShape(14.dp)
-    Column(Modifier.width(132.dp).onFocusChanged { focused = it.isFocused }
+    Column(Modifier.width(132.dp).onFocusChanged { focused = it.isFocused; if (it.isFocused) onFocus() }
         .clip(shape).then(if (focused) Modifier.border(2.dp, violet, shape) else Modifier)
         .clickable(onClick = onClick).padding(2.dp)) {
         Box(Modifier.size(128.dp).clip(RoundedCornerShape(11.dp)).background(panel)) {
