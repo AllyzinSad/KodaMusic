@@ -22,6 +22,10 @@ jobs:
           gradle-version: '8.9'
       - name: Test and build
         run: gradle -p KodaAnimeTV :app:testDebugUnitTest :app:assembleDebug --stacktrace
+      - uses: actions/upload-artifact@v4
+        with:
+          name: KodaAnimeTV-0.18-apk
+          path: KodaAnimeTV/app/build/outputs/apk/debug/app-debug.apk
       - name: Package complete source
         run: |
           rm -rf KodaAnimeTV/app/build KodaAnimeTV/.gradle
@@ -29,10 +33,6 @@ jobs:
             -x "KodaAnimeTV/.git/*" \
                "KodaAnimeTV/**/.gradle/*" \
                "KodaAnimeTV/**/build/*"
-      - uses: actions/upload-artifact@v4
-        with:
-          name: KodaAnimeTV-0.18-apk
-          path: KodaAnimeTV/app/build/outputs/apk/debug/app-debug.apk
       - uses: actions/upload-artifact@v4
         with:
           name: KodaAnimeTV-0.18-source
