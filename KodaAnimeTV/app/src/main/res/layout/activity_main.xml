@@ -1,13 +1,13 @@
 <androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto" android:id="@+id/home_root"
-    android:layout_width="match_parent" android:layout_height="match_parent" android:background="#0A0A0D">
-    <!-- The page scrolls vertically so full 160dp / 2:3 cards remain accessible on HD TVs. -->
+    android:layout_width="match_parent" android:layout_height="match_parent" android:background="#0A0A12">
+    <!-- The page scrolls vertically so full 150dp / 2:3 cards remain accessible on HD TVs. -->
     <androidx.core.widget.NestedScrollView android:id="@+id/home_scroll" android:layout_width="0dp" android:layout_height="0dp"
         android:fillViewport="true" android:clipToPadding="false" android:scrollbars="none"
         app:layout_constraintTop_toTopOf="parent" app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent" app:layout_constraintEnd_toEndOf="parent">
         <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
-            <androidx.constraintlayout.widget.ConstraintLayout android:id="@+id/hero_container" android:layout_width="match_parent" android:layout_height="351dp">
+            <androidx.constraintlayout.widget.ConstraintLayout android:id="@+id/hero_container" android:layout_width="match_parent" android:layout_height="324dp">
                 <ImageView android:id="@+id/hero_banner" android:layout_width="0dp" android:layout_height="0dp" android:scaleType="centerCrop" android:importantForAccessibility="no"
                     app:layout_constraintTop_toTopOf="parent" app:layout_constraintBottom_toBottomOf="parent" app:layout_constraintStart_toStartOf="parent" app:layout_constraintEnd_toEndOf="parent"/>
                 <View android:layout_width="0dp" android:layout_height="0dp" android:background="@drawable/bg_hero_scrim"
@@ -33,7 +33,7 @@
                     <TextView android:id="@+id/hero_synopsis" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp"
                         android:textSize="14sp" android:textColor="#CCCCCC" android:maxLines="3" android:ellipsize="end"/>
                     <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginTop="14dp">
-                        <Button android:id="@+id/btn_watch" style="@style/HeroButton" android:text="Assistir" android:textColor="#0A0A0D" android:background="@drawable/bg_button_primary"
+                        <Button android:id="@+id/btn_watch" style="@style/HeroButton" android:text="Assistir" android:textColor="#FFFFFF" android:background="@drawable/bg_button_primary"
                             android:nextFocusRight="@id/btn_more_info" android:nextFocusDown="@id/rv_catalog_row" android:nextFocusUp="@id/nav_search"/>
                         <Button android:id="@+id/btn_more_info" style="@style/HeroButton" android:text="Mais Informações" android:layout_marginStart="12dp"
                             android:nextFocusLeft="@id/btn_watch" android:nextFocusDown="@id/rv_catalog_row" android:nextFocusUp="@id/nav_search"/>

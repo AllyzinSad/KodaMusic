@@ -1,4 +1,4 @@
-# Koda Anime TV — versão de teste 0.11
+# Koda Anime TV — versão de teste 0.12
 
 Projeto Android TV e celular em Java. Visual preto/branco/vermelho inspirado em `design/referencia-aprovada.png` (a imagem é apenas referência; a interface é nativa e interativa). Navegação com D-pad, catálogo, pesquisa com filtros, favoritos, histórico local, retomada, player e vinculação Google por código.
 
@@ -49,3 +49,7 @@ Testes automatizados cobrem persistência após recriação do cache, expiraçã
 ## Interface 0.11
 
 Tela inicial migrada para XML com hero banner e RecyclerView horizontal. Consulte INTERFACE-TV.md para mapa de arquivos, dependências, navegação e limites. Player mantido sem alteração.
+
+## Identidade visual 0.12
+
+Home azul da meia-noite, hero 60%, botões em degradê laranja/vermelho, cards 150dp e proporção 2:3, raio 8dp e título externo 13sp. Player preservado. Instruções completas em INTERFACE-TV.md.

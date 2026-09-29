@@ -1,17 +1,17 @@
-# Interface de streaming — versão 0.11
+# Interface de streaming — versão 0.12
 
 A tela inicial agora usa XML nativo, mantendo catálogo e player do projeto.
 
 ## Arquivos
 
-- `app/src/main/res/layout/activity_main.xml`: ConstraintLayout preto; banner centerCrop com altura calculada em 65% da área útil; gradientes; título 36sp; sinopse 14sp de três linhas; Assistir e Mais Informações; RecyclerViews horizontais. A página permite rolagem vertical para que cards altos sejam acessíveis em TVs HD.
-- `app/src/main/res/layout/item_anime.xml`: largura de 160dp; CardView com cantos 12dp, proporção `H,2:3`, pôster centerCrop, pílula DUB/LEG e título abaixo, negrito, 14sp e uma linha.
+- `app/src/main/res/layout/activity_main.xml`: ConstraintLayout preto; banner centerCrop com altura calculada em 60% da área útil; gradientes; título 36sp; sinopse 14sp de três linhas; Assistir e Mais Informações; RecyclerViews horizontais. A página permite rolagem vertical para que cards altos sejam acessíveis em TVs HD.
+- `app/src/main/res/layout/item_anime.xml`: largura de 150dp; CardView com cantos 8dp, proporção `H,2:3`, pôster centerCrop, pílula DUB/LEG e título abaixo, negrito, 13sp e uma linha.
 - `app/src/main/res/drawable/bg_gradient_hero.xml`: transparente → preto, de cima para baixo (270 graus).
 - `bg_hero_scrim.xml`: sombra lateral para leitura do texto.
-- `bg_button_primary.xml`: branco; laranja #FF6600 quando focado/pressionado; raio 4dp.
-- `bg_button_secondary.xml`: cinza escuro translúcido; laranja no foco; raio 4dp.
+- `bg_button_primary.xml`: degradê laranja #FF702F → vermelho escuro #981E38; realce quente no foco; raio 4dp.
+- `bg_button_secondary.xml`: cinza escuro translúcido; contorno #FF7849 no foco; raio 4dp.
 - `bg_audio_pill.xml` e `bg_card_focus.xml`: badge de áudio e foco laranja.
-- `app/src/main/res/values/themes.xml`: Theme.KodaAnime herda de Theme.AppCompat.NoActionBar; fundo #0A0A0D.
+- `app/src/main/res/values/themes.xml`: Theme.KodaAnime herda de Theme.AppCompat.NoActionBar; fundo #0A0A12.
 - `MainActivity.java`: AppCompatActivity; onCreate chama showHome, que infla activity_main e configura LinearLayoutManager.HORIZONTAL; mantém busca, favoritos, histórico e detalhes.
 - `AnimeRowAdapter.java`: reciclagem dos cards, eventos de foco e seleção, atualização do banner sem iniciar vídeo automaticamente.
 
@@ -57,10 +57,14 @@ não um backdrop horizontal separado. Por isso o banner usa o pôster recortado
 com centerCrop: não distorce a imagem, mas pode cortar partes da ilustração.
 Para maior fidelidade, forneça uma URL de backdrop horizontal por anime.
 
-O banner ocupa 65% da área útil inicial. Cards 160x240dp mais título não cabem
+O banner ocupa 60% da área útil inicial. Cards 150x225dp mais título não cabem
 no restante de uma TV com UI 540dp; a página rola verticalmente, mantendo a
 proporção. Os títulos e os cards não são comprimidos para tentar caber.
 
 Valide no controle: botão Assistir, Mais Informações, todas as fileiras,
 retorno dos detalhes, navegação nas extremidades e reprodução. Compilação não
 substitui validação em Android TV físico.
+
+## Identidade Koda 0.12
+
+Azul da meia-noite #0A0A12, névoa nas bordas/base do hero e centro transparente. Fundo do card recebe destaque discreto no foco, com duas bordas translúcidas de brilho simulado. Título permanece abaixo do pôster. MainActivity.updateHero atualiza texto e imagem ao receber onFocused do adapter; guardas de geração impedem respostas de telas anteriores. O mesmo anime focado novamente não dispara download redundante do banner.

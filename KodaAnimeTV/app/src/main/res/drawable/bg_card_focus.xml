@@ -1,4 +1,9 @@
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:state_focused="true"><shape><solid android:color="#00FFFFFF"/><stroke android:width="3dp" android:color="#FF6600"/><corners android:radius="12dp"/></shape></item>
-    <item><shape><solid android:color="#00FFFFFF"/></shape></item>
+    <item android:state_focused="true">
+        <layer-list>
+            <item><shape><solid android:color="#08FF7849"/><stroke android:width="4dp" android:color="#40FF7849"/><corners android:radius="8dp"/></shape></item>
+            <item android:left="1dp" android:right="1dp" android:top="1dp" android:bottom="1dp"><shape><solid android:color="#00000000"/><stroke android:width="1.5dp" android:color="#FFFF7849"/><corners android:radius="7dp"/></shape></item>
+        </layer-list>
+    </item>
+    <item><shape><solid android:color="#00000000"/></shape></item>
 </selector>

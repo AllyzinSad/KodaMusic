@@ -1,3 +1,5 @@
-<shape xmlns:android="http://schemas.android.com/apk/res/android">
-    <gradient android:angle="0" android:startColor="#EE0A0A0D" android:endColor="#000A0A0D" />
-</shape>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Transparent center preserves the artwork; shading stays at the edges. -->
+    <item><shape><gradient android:angle="0" android:startColor="#CC0A0A12" android:centerColor="#000A0A12" android:centerX="0.65" android:endColor="#660A0A12"/></shape></item>
+    <item><shape><gradient android:angle="270" android:startColor="#990A0A12" android:centerColor="#000A0A12" android:centerY="0.25" android:endColor="#000A0A12"/></shape></item>
+</layer-list>

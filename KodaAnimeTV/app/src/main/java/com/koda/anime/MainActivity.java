@@ -12,7 +12,7 @@ import android.widget.*;
 import java.util.*;
 
 public final class MainActivity extends androidx.appcompat.app.AppCompatActivity {
-    private static final int BLACK=0xFF0A0A0D, SIDE=0xFF101013, RED=0xFFE7333E, WHITE=0xFFF7F7F9, MUTED=0xFFB9B9C2;
+    private static final int BLACK=0xFF0A0A12, SIDE=0xFF101013, RED=0xFFE7333E, WHITE=0xFFF7F7F9, MUTED=0xFFB9B9C2;
     private LinearLayout content,nav; private String page="Início"; private boolean playerOpened; private Anime selectedAnime; private String returnPage="Início",detailFocus=""; private int searchGeneration; private final Map<String,Anime> seen=new LinkedHashMap<>();
     private final ArrayList<TextView> navButtons=new ArrayList<>();
     @Override public void onCreate(Bundle state){super.onCreate(state);Net.initialize(this);getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,WindowManager.LayoutParams.FLAG_FULLSCREEN);showHome();}
@@ -54,7 +54,7 @@ public final class MainActivity extends androidx.appcompat.app.AppCompatActivity
         viewport.addView(home,screenFit.centered());setContentView(viewport);
         View hero=home.findViewById(R.id.hero_container);
         home.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob)->{
-            int desired=Math.round((b-t)*.65f);
+            int desired=Math.round((b-t)*.60f);
             if(desired>0 && hero.getLayoutParams().height!=desired){ViewGroup.LayoutParams params=hero.getLayoutParams();params.height=desired;hero.setLayoutParams(params);}
         });
         home.findViewById(R.id.nav_search).setOnClickListener(v->showSearch());
@@ -95,6 +95,7 @@ public final class MainActivity extends androidx.appcompat.app.AppCompatActivity
         AnimeRowAdapter adapter=new AnimeRowAdapter(listener);row.setAdapter(adapter);return adapter;
     }
     private void updateHero(View home,Anime anime){
+        if(heroAnime==anime)return;
         heroAnime=anime;
         ((TextView)home.findViewById(R.id.hero_title)).setText(anime.title);
         ((TextView)home.findViewById(R.id.hero_synopsis)).setText(anime.description.isEmpty()?"Abra Mais Informações para consultar os episódios e versões disponíveis.":anime.description);
