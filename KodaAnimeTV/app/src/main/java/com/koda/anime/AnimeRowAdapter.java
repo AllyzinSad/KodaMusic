@@ -25,14 +25,14 @@ public final class AnimeRowAdapter extends RecyclerView.Adapter<AnimeRowAdapter.
         Anime anime=items.get(position);
         holder.image.setTag(null);holder.image.setImageDrawable(null);
         holder.title.setText(anime.getName());
-        holder.title.setTextColor(holder.itemView.hasFocus()?0xFFFF7849:0xFFFFFFFF);
+        holder.title.setTextColor(holder.itemView.hasFocus()?0xFFFF1635:0xFFFFFFFF);
         holder.itemView.setTranslationZ(holder.itemView.hasFocus()?8f:0f);
         String audio=anime.isDubbed()?"DUB":"LEG";
         holder.audio.setText(audio);holder.itemView.setContentDescription(anime.title+", "+audio);
         Net.image(anime.poster,holder.image);
         holder.itemView.setOnClickListener(v->listener.onSelected(anime));
         holder.itemView.setOnFocusChangeListener((v,focused)->{
-            holder.title.setTextColor(focused?0xFFFF7849:0xFFFFFFFF);
+            holder.title.setTextColor(focused?0xFFFF1635:0xFFFFFFFF);
             v.setTranslationZ(focused?8f:0f);
             if(focused)listener.onAnimeFocused(anime);
         });
