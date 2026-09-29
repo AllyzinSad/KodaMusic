@@ -1,0 +1,51 @@
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto" android:id="@+id/home_root"
+    android:layout_width="match_parent" android:layout_height="match_parent" android:background="#0A0A0D">
+    <!-- The page scrolls vertically so full 160dp / 2:3 cards remain accessible on HD TVs. -->
+    <androidx.core.widget.NestedScrollView android:id="@+id/home_scroll" android:layout_width="0dp" android:layout_height="0dp"
+        android:fillViewport="true" android:clipToPadding="false" android:scrollbars="none"
+        app:layout_constraintTop_toTopOf="parent" app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent" app:layout_constraintEnd_toEndOf="parent">
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
+            <androidx.constraintlayout.widget.ConstraintLayout android:id="@+id/hero_container" android:layout_width="match_parent" android:layout_height="351dp">
+                <ImageView android:id="@+id/hero_banner" android:layout_width="0dp" android:layout_height="0dp" android:scaleType="centerCrop" android:importantForAccessibility="no"
+                    app:layout_constraintTop_toTopOf="parent" app:layout_constraintBottom_toBottomOf="parent" app:layout_constraintStart_toStartOf="parent" app:layout_constraintEnd_toEndOf="parent"/>
+                <View android:layout_width="0dp" android:layout_height="0dp" android:background="@drawable/bg_hero_scrim"
+                    app:layout_constraintTop_toTopOf="parent" app:layout_constraintBottom_toBottomOf="parent" app:layout_constraintStart_toStartOf="parent" app:layout_constraintEnd_toEndOf="parent"/>
+                <View android:layout_width="0dp" android:layout_height="0dp" android:background="@drawable/bg_gradient_hero"
+                    app:layout_constraintTop_toTopOf="parent" app:layout_constraintBottom_toBottomOf="parent" app:layout_constraintStart_toStartOf="parent" app:layout_constraintEnd_toEndOf="parent"/>
+                <HorizontalScrollView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_margin="24dp" android:scrollbars="none"
+                    app:layout_constraintTop_toTopOf="parent" app:layout_constraintStart_toStartOf="parent" app:layout_constraintEnd_toEndOf="parent">
+                    <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:gravity="center_vertical">
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Koda Anime" android:textSize="20sp" android:textStyle="bold" android:textColor="#FFFFFF" android:layout_marginEnd="24dp"/>
+                        <Button android:id="@+id/nav_search" style="@style/HeroButton" android:text="Pesquisa"/>
+                        <Button android:id="@+id/nav_favorites" style="@style/HeroButton" android:text="Favoritos" android:layout_marginStart="8dp"/>
+                        <Button android:id="@+id/nav_history" style="@style/HeroButton" android:text="Histórico" android:layout_marginStart="8dp"/>
+                        <Button android:id="@+id/nav_settings" style="@style/HeroButton" android:text="Configurações" android:layout_marginStart="8dp"/>
+                    </LinearLayout>
+                </HorizontalScrollView>
+                <LinearLayout android:id="@+id/hero_info" android:layout_width="0dp" android:layout_height="wrap_content" android:orientation="vertical"
+                    android:layout_marginStart="32dp" android:layout_marginBottom="16dp" android:layout_marginTop="88dp"
+                    app:layout_constraintWidth_percent="0.68" app:layout_constraintHorizontal_bias="0"
+                    app:layout_constraintStart_toStartOf="parent" app:layout_constraintEnd_toEndOf="parent" app:layout_constraintBottom_toBottomOf="parent">
+                    <TextView android:id="@+id/hero_title" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Koda Anime"
+                        android:textSize="36sp" android:textStyle="bold" android:textColor="#FFFFFF" android:maxLines="2" android:ellipsize="end"/>
+                    <TextView android:id="@+id/hero_synopsis" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp"
+                        android:textSize="14sp" android:textColor="#CCCCCC" android:maxLines="3" android:ellipsize="end"/>
+                    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginTop="14dp">
+                        <Button android:id="@+id/btn_watch" style="@style/HeroButton" android:text="Assistir" android:textColor="#0A0A0D" android:background="@drawable/bg_button_primary"
+                            android:nextFocusRight="@id/btn_more_info" android:nextFocusDown="@id/rv_catalog_row" android:nextFocusUp="@id/nav_search"/>
+                        <Button android:id="@+id/btn_more_info" style="@style/HeroButton" android:text="Mais Informações" android:layout_marginStart="12dp"
+                            android:nextFocusLeft="@id/btn_watch" android:nextFocusDown="@id/rv_catalog_row" android:nextFocusUp="@id/nav_search"/>
+                    </LinearLayout>
+                </LinearLayout>
+            </androidx.constraintlayout.widget.ConstraintLayout>
+            <TextView android:id="@+id/catalog_status" android:layout_width="match_parent" android:layout_height="wrap_content" android:paddingStart="32dp" android:paddingEnd="32dp" android:textColor="#CCCCCC" android:textSize="14sp" android:text="Carregando catálogo…"/>
+            <Button android:id="@+id/btn_retry" style="@style/HeroButton" android:layout_marginStart="32dp" android:text="Tentar novamente" android:visibility="gone"/>
+            <TextView android:id="@+id/catalog_row_title" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginStart="32dp" android:layout_marginTop="10dp" android:text="Recomendados" android:textColor="#FFFFFF" android:textSize="20sp" android:textStyle="bold"/>
+            <androidx.recyclerview.widget.RecyclerView android:id="@+id/rv_catalog_row" android:layout_width="match_parent" android:layout_height="wrap_content" android:paddingStart="32dp" android:paddingEnd="32dp" android:paddingTop="12dp" android:paddingBottom="16dp" android:clipToPadding="false" android:clipChildren="false" android:focusable="true" android:descendantFocusability="afterDescendants" android:nextFocusUp="@id/btn_watch" android:scrollbars="none"/>
+            <TextView android:id="@+id/recent_row_title" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginStart="32dp" android:text="Lançados recentemente" android:textColor="#FFFFFF" android:textSize="20sp" android:textStyle="bold"/>
+            <androidx.recyclerview.widget.RecyclerView android:id="@+id/rv_recent_row" android:layout_width="match_parent" android:layout_height="wrap_content" android:paddingStart="32dp" android:paddingEnd="32dp" android:paddingTop="12dp" android:paddingBottom="24dp" android:clipToPadding="false" android:clipChildren="false" android:scrollbars="none"/>
+        </LinearLayout>
+    </androidx.core.widget.NestedScrollView>
+</androidx.constraintlayout.widget.ConstraintLayout>

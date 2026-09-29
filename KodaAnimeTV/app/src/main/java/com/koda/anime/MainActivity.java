@@ -11,7 +11,7 @@ import android.view.inputmethod.InputMethodManager;
 import android.widget.*;
 import java.util.*;
 
-public final class MainActivity extends Activity {
+public final class MainActivity extends androidx.appcompat.app.AppCompatActivity {
     private static final int BLACK=0xFF0A0A0D, SIDE=0xFF101013, RED=0xFFE7333E, WHITE=0xFFF7F7F9, MUTED=0xFFB9B9C2;
     private LinearLayout content,nav; private String page="Início"; private boolean playerOpened; private Anime selectedAnime; private String returnPage="Início",detailFocus=""; private int searchGeneration; private final Map<String,Anime> seen=new LinkedHashMap<>();
     private final ArrayList<TextView> navButtons=new ArrayList<>();
@@ -44,18 +44,81 @@ public final class MainActivity extends Activity {
     }
     private GradientDrawable outline(int fill,int stroke,int radius,int width){GradientDrawable d=bg(fill,radius);d.setStroke(dp(width),stroke);return d;}
     private TextView heading(String title){TextView t=label(title,20,WHITE,true);LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,-2);p.topMargin=dp(25);p.bottomMargin=dp(10);content.addView(t,p);return t;}
-    private void showHome(){shell("Início");final int generation=screenGeneration;content.addView(label("Descubra sua próxima história",21,MUTED,false));
-        heading("Recomendados para você");LinearLayout recommended=row();TextView status=label("Carregando recomendações...",16,MUTED,false);recommended.addView(status);
-        Catalog.recommendations((list,error)->{if(generation!=screenGeneration)return;recommended.removeAllViews();if(error!=null){recommended.addView(button("Tentar carregar recomendações novamente",this::showHome));return;}cards(recommended,list,true);});
-        heading("Lançados recentemente");LinearLayout recent=row();recent.addView(label("Carregando lançamentos...",16,MUTED,false));
-        Catalog.recent((list,error)->{if(generation!=screenGeneration)return;recent.removeAllViews();if(error!=null){recent.addView(button("Tentar carregar lançamentos novamente",this::showHome));return;}cards(recent,list,false);});
-        List<WatchHistory.Entry> history=WatchHistory.all(this);if(!history.isEmpty()){
-            heading("Continuar assistindo");LinearLayout continueRow=row();HashSet<String> shown=new HashSet<>();
-            for(WatchHistory.Entry e:history){if(e.watched()||!shown.add(e.animeId)||shown.size()>12)continue;
-                Anime a=new Anime(e.animeId,e.title,e.poster,e.episode+" · "+formatTime(e.position),"Continuar",0,e.url);
-                continueRow.addView(card(a,false));}
-        }
-
+    private Anime heroAnime;
+    private void showHome(){
+        screenGeneration++;Net.clearImageQueue();page="Início";navButtons.clear();heroAnime=null;
+        final int generation=screenGeneration;
+        screenFit=new ScreenFit(this);
+        FrameLayout viewport=new FrameLayout(this);viewport.setBackgroundColor(BLACK);
+        View home=getLayoutInflater().inflate(R.layout.activity_main,viewport,false);
+        viewport.addView(home,screenFit.centered());setContentView(viewport);
+        View hero=home.findViewById(R.id.hero_container);
+        home.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob)->{
+            int desired=Math.round((b-t)*.65f);
+            if(desired>0 && hero.getLayoutParams().height!=desired){ViewGroup.LayoutParams params=hero.getLayoutParams();params.height=desired;hero.setLayoutParams(params);}
+        });
+        home.findViewById(R.id.nav_search).setOnClickListener(v->showSearch());
+        home.findViewById(R.id.nav_favorites).setOnClickListener(v->showFavorites());
+        home.findViewById(R.id.nav_history).setOnClickListener(v->showHistory());
+        home.findViewById(R.id.nav_settings).setOnClickListener(v->showSettings());
+        Button watch=home.findViewById(R.id.btn_watch),more=home.findViewById(R.id.btn_more_info);
+        watch.setEnabled(false);more.setEnabled(false);
+        watch.setOnClickListener(v->watchHero(home,generation));
+        more.setOnClickListener(v->{if(heroAnime!=null)details(heroAnime);});
+        home.findViewById(R.id.btn_retry).setOnClickListener(v->showHome());
+        AnimeRowAdapter.Listener listener=new AnimeRowAdapter.Listener(){
+            @Override public void onSelected(Anime anime){details(anime);}
+            @Override public void onFocused(Anime anime){if(screenGeneration==generation)updateHero(home,anime);}
+        };
+        AnimeRowAdapter recommendations=setupHomeRow(home,R.id.rv_catalog_row,listener);
+        AnimeRowAdapter recent=setupHomeRow(home,R.id.rv_recent_row,listener);
+        TextView status=home.findViewById(R.id.catalog_status);
+        home.findViewById(R.id.nav_search).requestFocus();
+        Catalog.recommendations((list,error)->{
+            if(generation!=screenGeneration)return;
+            if(error!=null || list.isEmpty()){
+                status.setText("Não foi possível carregar as recomendações.");home.findViewById(R.id.btn_retry).setVisibility(View.VISIBLE);return;
+            }
+            recommendations.submit(list);for(Anime anime:list)seen.put(anime.id,anime);
+            status.setVisibility(View.GONE);if(heroAnime==null)updateHero(home,list.get(0));
+        });
+        Catalog.recent((list,error)->{
+            if(generation!=screenGeneration)return;
+            recent.submit(list);
+            if(error!=null || list.isEmpty())((TextView)home.findViewById(R.id.recent_row_title)).setText("Lançamentos indisponíveis no momento");
+        });
+    }
+    private AnimeRowAdapter setupHomeRow(View home,int id,AnimeRowAdapter.Listener listener){
+        androidx.recyclerview.widget.RecyclerView row=home.findViewById(id);
+        row.setLayoutManager(new androidx.recyclerview.widget.LinearLayoutManager(this,androidx.recyclerview.widget.LinearLayoutManager.HORIZONTAL,false));
+        row.setNestedScrollingEnabled(false);row.setItemAnimator(null);
+        AnimeRowAdapter adapter=new AnimeRowAdapter(listener);row.setAdapter(adapter);return adapter;
+    }
+    private void updateHero(View home,Anime anime){
+        heroAnime=anime;
+        ((TextView)home.findViewById(R.id.hero_title)).setText(anime.title);
+        ((TextView)home.findViewById(R.id.hero_synopsis)).setText(anime.description.isEmpty()?"Abra Mais Informações para consultar os episódios e versões disponíveis.":anime.description);
+        ImageView banner=home.findViewById(R.id.hero_banner);banner.setTag(null);banner.setImageDrawable(null);Net.image(anime.poster,banner);
+        Button watch=home.findViewById(R.id.btn_watch);watch.setEnabled(true);watch.setText("Assistir");
+        for(WatchHistory.Entry entry:WatchHistory.all(this))if(entry.animeId.equals(historyId(anime))&&!entry.watched()){watch.setText("Continuar");break;}
+        home.findViewById(R.id.btn_more_info).setEnabled(true);
+    }
+    private void watchHero(View home,int generation){
+        final Anime anime=heroAnime;if(anime==null)return;
+        Button watch=home.findViewById(R.id.btn_watch);watch.setEnabled(false);watch.setText("Carregando…");
+        Catalog.episodes(anime,(episodes,error)->{
+            if(generation!=screenGeneration || heroAnime!=anime)return;
+            watch.setEnabled(true);watch.setText("Assistir");
+            if(episodes.isEmpty()){Toast.makeText(this,"Escolha uma versão disponível na página do anime.",Toast.LENGTH_LONG).show();details(anime);return;}
+            int index=0;long resume=0;
+            for(WatchHistory.Entry entry:WatchHistory.all(this)){
+                if(!entry.animeId.equals(historyId(anime))||entry.watched())continue;
+                for(int n=0;n<episodes.size();n++)if(episodes.get(n).description.equals(entry.episode)){index=n;resume=entry.position;break;}
+                break;
+            }
+            Anime episode=episodes.get(index);
+            play(anime,episode.description,episode.playUrl,index+1<episodes.size()?episodes.get(index+1).playUrl:"",index+1<episodes.size()?episodes.get(index+1).description:"",resume);
+        });
     }
     private LinearLayout row(){HorizontalScrollView scroll=new HorizontalScrollView(this);scroll.setHorizontalScrollBarEnabled(false);LinearLayout row=new LinearLayout(this);row.setPadding(dp(2),dp(4),dp(2),dp(12));scroll.addView(row);content.addView(scroll,new LinearLayout.LayoutParams(-1,-2));return row;}
     private void cards(LinearLayout row,List<Anime> items,boolean large){for(Anime a:items){seen.put(a.id,a);row.addView(card(a,large));}}

@@ -1,0 +1,25 @@
+<resources>
+    <style name="Theme.KodaAnime" parent="Theme.AppCompat.NoActionBar">
+        <item name="android:windowBackground">#0A0A0D</item>
+        <item name="android:colorBackground">#0A0A0D</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:statusBarColor">#0A0A0D</item>
+        <item name="android:navigationBarColor">#0A0A0D</item>
+        <item name="colorAccent">#FF6600</item>
+        <item name="android:fontFamily">sans</item>
+    </style>
+    <style name="HeroButton">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">48dp</item>
+        <item name="android:minWidth">140dp</item>
+        <item name="android:paddingLeft">20dp</item>
+        <item name="android:paddingRight">20dp</item>
+        <item name="android:textSize">14sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="android:focusable">true</item>
+        <item name="android:clickable">true</item>
+        <item name="android:background">@drawable/bg_button_secondary</item>
+        <item name="android:textColor">#FFFFFF</item>
+    </style>
+</resources>
