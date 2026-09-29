@@ -1,7 +1,7 @@
 name: Koda Anime TV APK
 on:
   push:
-    branches: [ koda-anime-tv-test ]
+    branches: [ koda-anime-tv-test, koda-anime-tv-clean-v2 ]
   workflow_dispatch:
 jobs:
   build:
