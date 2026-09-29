@@ -12,11 +12,11 @@ import android.widget.*;
 import java.util.*;
 
 public final class MainActivity extends androidx.appcompat.app.AppCompatActivity {
-    private static final int BLACK=0xFF08080A, SIDE=0xFF0E0E12, RED=0xFFFF1635, RED_DARK=0xFF9E001B, WHITE=0xFFFFFFFF, MUTED=0xFFB8B8C0; private static final String VERSION="0.15-redesign";
+    private static final int BLACK=0xFF08080A, SIDE=0xFF0E0E12, RED=0xFFFF1635, RED_DARK=0xFF9E001B, WHITE=0xFFFFFFFF, MUTED=0xFFB8B8C0; private static final String VERSION="0.16-responsive";
     private LinearLayout content,nav; private String page="Início"; private boolean playerOpened; private Anime selectedAnime; private String returnPage="Início",detailFocus=""; private int searchGeneration; private final Map<String,Anime> seen=new LinkedHashMap<>();
     private Anime heroAnime; private ImageView homeHeroImage; private TextView homeHeroTitle,homeHeroDescription,homeHeroWatch;
     private final ArrayList<TextView> navButtons=new ArrayList<>();
-    @Override public void onCreate(Bundle state){super.onCreate(state);Net.initialize(this);getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,WindowManager.LayoutParams.FLAG_FULLSCREEN);showHome();}
+    @Override public void onCreate(Bundle state){super.onCreate(state);Net.initialize(this);ScreenFit.immersive(this);showHome();}
     private int screenGeneration;
     private ScreenFit screenFit;
     private float uiScale(){if(screenFit==null)screenFit=new ScreenFit(this);return screenFit.textScale(this);}
@@ -41,7 +41,7 @@ public final class MainActivity extends androidx.appcompat.app.AppCompatActivity
         viewport.addView(frame,screenFit.centered());
 
         nav=column(); nav.setBackgroundColor(0xF20B0B0E); pad(nav,16,18,12,18);
-        frame.addView(nav,new LinearLayout.LayoutParams(dp(168),-1));
+        frame.addView(nav,new LinearLayout.LayoutParams(dp(190),-1));
 
         ImageView brand=new ImageView(this); brand.setImageResource(R.mipmap.ic_launcher); brand.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
         LinearLayout.LayoutParams brandLp=new LinearLayout.LayoutParams(-1,dp(82)); brandLp.bottomMargin=dp(8); nav.addView(brand,brandLp);
@@ -68,7 +68,7 @@ public final class MainActivity extends androidx.appcompat.app.AppCompatActivity
 
     private void navItem(String name,String icon,Runnable action){
         boolean selected=page.equals(name);
-        TextView v=label(name,14,selected?WHITE:MUTED,selected); v.setGravity(Gravity.CENTER_VERTICAL); pad(v,12,0,8,0);
+        TextView v=label(name,13,selected?WHITE:MUTED,selected); v.setGravity(Gravity.CENTER_VERTICAL); v.setSingleLine(true); v.setEllipsize(android.text.TextUtils.TruncateAt.END); pad(v,12,0,8,0);
         NavIcon glyph=new NavIcon(name,selected?WHITE:MUTED); glyph.setBounds(0,0,dp(21),dp(21));
         v.setCompoundDrawables(glyph,null,null,null); v.setCompoundDrawablePadding(dp(12)); v.setFocusable(true);
         v.setBackground(selected?outline(0xB3210710,RED,8,1):bg(Color.TRANSPARENT,8));
@@ -84,12 +84,14 @@ public final class MainActivity extends androidx.appcompat.app.AppCompatActivity
 
     private GradientDrawable outline(int fill,int stroke,int radius,int width){GradientDrawable d=bg(fill,radius);d.setStroke(dp(width),stroke);return d;}
     private TextView heading(String title){TextView t=label(title,20,WHITE,true);LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,-2);p.topMargin=dp(18);p.bottomMargin=dp(9);content.addView(t,p);return t;}
-    private TextView sectionTitle(String title){LinearLayout row=new LinearLayout(this);row.setGravity(Gravity.CENTER_VERTICAL);View accent=new View(this);accent.setBackgroundColor(RED);row.addView(accent,new LinearLayout.LayoutParams(dp(4),dp(22)));TextView t=label(title,18,WHITE,true);LinearLayout.LayoutParams tp=new LinearLayout.LayoutParams(0,-2,1);tp.leftMargin=dp(10);row.addView(t,tp);LinearLayout.LayoutParams rp=new LinearLayout.LayoutParams(-1,-2);rp.topMargin=dp(12);rp.bottomMargin=dp(7);content.addView(row,rp);return t;}
+    private TextView sectionTitle(String title){LinearLayout row=new LinearLayout(this);row.setGravity(Gravity.CENTER_VERTICAL);View accent=new View(this);accent.setBackgroundColor(RED);row.addView(accent,new LinearLayout.LayoutParams(dp(4),dp(22)));TextView t=label(title,18,WHITE,true);LinearLayout.LayoutParams tp=new LinearLayout.LayoutParams(0,-2,1);tp.leftMargin=dp(10);row.addView(t,tp);LinearLayout.LayoutParams rp=new LinearLayout.LayoutParams(-1,-2);rp.topMargin=dp(18);rp.bottomMargin=dp(10);content.addView(row,rp);return t;}
     private androidx.recyclerview.widget.RecyclerView rail(){
         androidx.recyclerview.widget.RecyclerView row=new androidx.recyclerview.widget.RecyclerView(this);
         row.setLayoutManager(new androidx.recyclerview.widget.LinearLayoutManager(this,androidx.recyclerview.widget.LinearLayoutManager.HORIZONTAL,false));
-        row.setNestedScrollingEnabled(false); row.setItemAnimator(null); row.setClipToPadding(false); row.setClipChildren(false);
-        LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,dp(214)); lp.bottomMargin=dp(4); content.addView(row,lp); return row;
+        row.setNestedScrollingEnabled(false);row.setItemAnimator(null);row.setClipToPadding(false);row.setClipChildren(false);
+        row.setPadding(dp(2),dp(4),dp(6),dp(8));
+        LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,ViewGroup.LayoutParams.WRAP_CONTENT);
+        lp.topMargin=dp(2);lp.bottomMargin=dp(18);content.addView(row,lp);return row;
     }
     private AnimeRowAdapter attachRail(androidx.recyclerview.widget.RecyclerView row,AnimeRowAdapter.OnAnimeSelectedListener listener){
         AnimeRowAdapter adapter=new AnimeRowAdapter(new ArrayList<>(),listener);row.setAdapter(adapter);return adapter;
@@ -181,9 +183,12 @@ public final class MainActivity extends androidx.appcompat.app.AppCompatActivity
     private LinearLayout row(){HorizontalScrollView scroll=new HorizontalScrollView(this);scroll.setHorizontalScrollBarEnabled(false);LinearLayout row=new LinearLayout(this);row.setPadding(dp(2),dp(4),dp(2),dp(12));scroll.addView(row);content.addView(scroll,new LinearLayout.LayoutParams(-1,-2));return row;}
     private void cards(LinearLayout row,List<Anime> items,boolean large){for(Anime a:items){seen.put(a.id,a);row.addView(card(a,large));}}
     private View card(Anime a,boolean large){
-        int width=large?146:132,height=large?218:198;
+        int available=Math.max(dp(620),screenFit.width-dp(228));
+        int widthPx=screenFit.recommendedCardWidth(available);
+        if(!large)widthPx=Math.round(widthPx*.92f);
+        int heightPx=Math.round(widthPx*1.50f);
         FrameLayout tile=new FrameLayout(this);tile.setFocusable(true);tile.setBackground(bg(0xFF121216,9));tile.setClipToOutline(false);
-        LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(dp(width),dp(height));lp.rightMargin=dp(14);tile.setLayoutParams(lp);
+        LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(widthPx,heightPx);lp.rightMargin=dp(14);tile.setLayoutParams(lp);
         ImageView image=new ImageView(this);image.setScaleType(ImageView.ScaleType.CENTER_CROP);image.setBackground(bg(0xFF18181D,8));tile.addView(image,new FrameLayout.LayoutParams(-1,-1));Net.image(a.poster,image);
         View shade=new View(this);shade.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,new int[]{0x00000000,0x25000000,0xF0000000}));tile.addView(shade,new FrameLayout.LayoutParams(-1,dp(70),Gravity.BOTTOM));
         TextView title=label(a.title,12,WHITE,true);title.setTypeface(Typeface.SERIF,Typeface.BOLD);title.setMaxLines(2);title.setEllipsize(android.text.TextUtils.TruncateAt.END);pad(title,9,0,8,8);tile.addView(title,new FrameLayout.LayoutParams(-1,-2,Gravity.BOTTOM));
