@@ -39,19 +39,36 @@ final class ScreenFit {
     }
 
     static void immersive(Activity activity){
+        if(activity==null||activity.getWindow()==null)return;
+        final android.view.Window window=activity.getWindow();
+        final android.view.View decor=window.getDecorView();
+        if(decor==null)return;
+
+        final int legacyFlags=
+            5894|
+            android.view.View.SYSTEM_UI_FLAG_FULLSCREEN|
+            android.view.View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN|
+            android.view.View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION|
+            android.view.View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY;
+
         if(Build.VERSION.SDK_INT>=30){
-            activity.getWindow().setDecorFitsSystemWindows(false);
-            WindowInsetsController c=activity.getWindow().getInsetsController();
-            if(c!=null){
-                c.hide(WindowInsets.Type.systemBars());
-                c.setSystemBarsBehavior(WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
-            }
+            window.setDecorFitsSystemWindows(false);
+            // Some Android/TV builds expose PhoneWindow before DecorView is attached.
+            // View#getWindowInsetsController safely returns null until attachment,
+            // unlike Window#getInsetsController which can throw from PhoneWindow.
+            decor.setSystemUiVisibility(legacyFlags);
+            decor.post(()->{
+                if(activity.isFinishing()||activity.isDestroyed())return;
+                WindowInsetsController c=decor.getWindowInsetsController();
+                if(c!=null){
+                    c.hide(WindowInsets.Type.systemBars());
+                    c.setSystemBarsBehavior(WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+                }else{
+                    decor.setSystemUiVisibility(legacyFlags);
+                }
+            });
         }else{
-            activity.getWindow().getDecorView().setSystemUiVisibility(
-                5894|android.view.View.SYSTEM_UI_FLAG_FULLSCREEN|
-                android.view.View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN|
-                android.view.View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION|
-                android.view.View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
+            decor.setSystemUiVisibility(legacyFlags);
         }
     }
 
