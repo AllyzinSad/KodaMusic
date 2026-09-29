@@ -15,7 +15,7 @@ public final class MainActivity extends Activity {
     private static final int BLACK=0xFF0A0A0D, SIDE=0xFF101013, RED=0xFFE7333E, WHITE=0xFFF7F7F9, MUTED=0xFFB9B9C2;
     private LinearLayout content,nav; private String page="Início"; private boolean playerOpened; private Anime selectedAnime; private String returnPage="Início",detailFocus=""; private int searchGeneration; private final Map<String,Anime> seen=new LinkedHashMap<>();
     private final ArrayList<TextView> navButtons=new ArrayList<>();
-    @Override public void onCreate(Bundle state){super.onCreate(state);getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,WindowManager.LayoutParams.FLAG_FULLSCREEN);showHome();}
+    @Override public void onCreate(Bundle state){super.onCreate(state);Net.initialize(this);getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,WindowManager.LayoutParams.FLAG_FULLSCREEN);showHome();}
     private int screenGeneration;
     private ScreenFit screenFit;
     private float uiScale(){if(screenFit==null)screenFit=new ScreenFit(this);return screenFit.textScale(this);}

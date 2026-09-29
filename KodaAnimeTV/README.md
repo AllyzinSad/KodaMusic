@@ -1,4 +1,4 @@
-# Koda Anime TV — versão de teste 0.8
+# Koda Anime TV — versão de teste 0.10
 
 Projeto Android TV e celular em Java. Visual preto/branco/vermelho inspirado em `design/referencia-aprovada.png` (a imagem é apenas referência; a interface é nativa e interativa). Navegação com D-pad, catálogo, pesquisa com filtros, favoritos, histórico local, retomada, player e vinculação Google por código.
 
@@ -6,7 +6,9 @@ Projeto Android TV e celular em Java. Visual preto/branco/vermelho inspirado em 
 
 Abra esta pasta no Android Studio com JDK 17, Android SDK 35 e conexão para baixar Gradle/Media3. Execute `:app:assembleDebug` ou **Build > Build APK(s)**. Arquivo: `app/build/outputs/apk/debug/app-debug.apk`.
 
-Também há `.github/workflows/android.yml`. Envie o conteúdo desta pasta para um repositório GitHub, execute **Actions > Android TV APK > Run workflow** e baixe o artefato `KodaAnimeTV-debug-apk`. Este ZIP é o código-fonte, não um APK compilado. Neste ambiente não havia Android SDK/Gradle para testar a compilação.
+Requisitos: JDK 17, Android SDK 35 e Gradle 8.9. O projeto não inclui Gradle Wrapper: instale Gradle 8.9 e execute `gradle :app:testDebugUnitTest :app:assembleDebug` nesta pasta, ou configure essa instalação no Android Studio. No Windows, `BUILD-WINDOWS.bat` usa o Gradle instalado no PATH.
+
+O ZIP também inclui `.github/workflows/koda-anime-tv.yml` na raiz externa, junto da pasta `KodaAnimeTV`. Mantenha essa estrutura no repositório para compilar pelo GitHub Actions; execute manualmente em Actions > Koda Anime TV APK. A compilação automática usa a branch `koda-anime-tv-test`.
 
 Instale em Android TV/Google TV/Mi Stick (Android TV OS) ou em um celular Android para testar. No celular a interface abre em paisagem e aparece no launcher normal. Telas Samsung Tizen e LG webOS não executam APK. O ícone é 512 px; o banner da TV está em `res/drawable/tv_banner.png`.
 
@@ -37,3 +39,9 @@ Home com proporções baseadas na referência aprovada, ícones desenhados e foc
 ## Atualização 0.8
 
 Ajuste automático pela largura e altura disponíveis, mantendo proporção 16:9. Margens de segurança de 3% por lado em TV/TV Box sem touchscreen e 1% em celulares. Interface centralizada; textos e controles do player usam a mesma escala. Vídeo continua preenchendo a área do player, respeitando a proporção original. Não identifica polegadas físicas. Recalcula ao recriar a tela por alteração de configuração.
+
+## Atualização 0.10 — catálogo
+
+Cache persistente de catálogo e recomendações por uma hora, leitura e escrita fora da interface. Em falha da fonte, permite reaproveitar metadados de até sete dias (podem estar desatualizados). Episódios, URLs de vídeos, recentes e dados de conta não são gravados nesse cache. Mantidas as filas separadas de imagens/API, o limite de espera e a rejeição de respostas de telas antigas da 0.9. PlayerActivity.java permanece byte a byte igual à versão 0.9. A primeira abertura ainda depende da velocidade da API.
+
+Testes automatizados cobrem persistência após recriação do cache, expiração, substituição de dados e exclusão de URLs de reprodução/conta. Validação de reprodução e navegação em aparelho físico ainda necessária.

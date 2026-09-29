@@ -23,6 +23,8 @@ final class Net {
     private static final java.util.LinkedHashMap<String,Cached> CACHE = new java.util.LinkedHashMap<>();
     private static final class Cached { Object value; long time; Cached(Object v){value=v;time=System.currentTimeMillis();} }
     private static final class Pending { java.util.List<Done<Object>> callbacks=new java.util.ArrayList<>(); Runnable timeout; java.util.concurrent.Future<?> work; }
+    private static volatile CatalogDiskCache diskCache;
+    static void initialize(android.content.Context context){if(diskCache==null)diskCache=new CatalogDiskCache(new File(context.getApplicationContext().getFilesDir(),"catalog-cache"));}
     static void clearImageQueue(){IMAGES.getQueue().clear();}
     static void json(String url, Done<JSONObject> done){get(url,false,(v,e)->done.accept((JSONObject)v,e));}
     static void jsonArray(String url, Done<JSONArray> done){get(url,true,(v,e)->done.accept((JSONArray)v,e));}
@@ -36,10 +38,28 @@ final class Net {
         pending.timeout=()->{finish(key,pending,null,new IOException("A conexão demorou demais. Tente novamente."));if(pending.work!=null)pending.work.cancel(true);};
         UI.postDelayed(pending.timeout,35000);
         pending.work=WORK.submit(()->{
-            try {String body=request(url,null);Object value=array?new JSONArray(body):new JSONObject(body);UI.post(()->finish(key,pending,value,null));}
-            catch(Exception error){UI.post(()->finish(key,pending,null,error));}
+            CatalogDiskCache disk=diskCache;
+            Object fallback=null;
+            if(disk!=null){
+                long now=System.currentTimeMillis();
+                String fresh=disk.read(url,3600000,now);
+                try { if(fresh!=null){Object value=parse(fresh,array);UI.post(()->finish(key,pending,value,null));return;} }
+                catch(Exception ignored) { /* Invalid local data must not prevent a network retry. */ }
+                String stale=disk.read(url,7L*24*3600000,now);
+                try {if(stale!=null)fallback=parse(stale,array);}catch(Exception ignored){}
+            }
+            final Object offline=fallback;
+            try {
+                String body=request(url,null);Object value=parse(body,array);
+                if(disk!=null)disk.write(url,body);
+                UI.post(()->finish(key,pending,value,null));
+            } catch(Exception error){UI.post(()->finish(key,pending,offline,offline==null?error:null));}
         });
     }
+    private static Object parse(String body,boolean array) throws org.json.JSONException {
+        return array?new JSONArray(body):new JSONObject(body);
+    }
+
     private static synchronized void finish(String key,Pending pending,Object value,Exception error){
         if(PENDING.get(key)!=pending)return;
         PENDING.remove(key);UI.removeCallbacks(pending.timeout);
@@ -66,7 +86,7 @@ final class Net {
     static String request(String url, String body) throws Exception {
         URL u = new URL(url); if (!"https".equalsIgnoreCase(u.getProtocol())) throw new IOException("Configure uma URL HTTPS.");
         HttpURLConnection c = (HttpURLConnection) u.openConnection(); c.setConnectTimeout(10000); c.setReadTimeout(25000);
-        c.setRequestProperty("User-Agent", "KodaAnimeTV/0.4 (Android)");
+        c.setRequestProperty("User-Agent", "KodaAnimeTV/0.10 (Android)");
         if (body != null) { c.setRequestMethod("POST"); c.setDoOutput(true); c.setRequestProperty("Content-Type", "application/x-www-form-urlencoded"); try(OutputStream out=c.getOutputStream()){out.write(body.getBytes(StandardCharsets.UTF_8));} }
         InputStream in = c.getResponseCode() < 400 ? c.getInputStream() : c.getErrorStream();
         if (in == null) throw new IOException("HTTP " + c.getResponseCode());

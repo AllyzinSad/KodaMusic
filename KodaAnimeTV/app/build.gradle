@@ -6,12 +6,13 @@ android {
         applicationId 'com.koda.anime.tv'
         minSdk 23
         targetSdk 35
-        versionCode 9
-        versionName '0.9-test'
+        versionCode 10
+        versionName '0.10-test'
     }
     compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
 }
 dependencies {
+    testImplementation 'junit:junit:4.13.2'
     implementation 'androidx.media3:media3-exoplayer:1.7.1'
     implementation 'androidx.media3:media3-exoplayer-hls:1.7.1'
     implementation 'androidx.media3:media3-ui:1.7.1'
