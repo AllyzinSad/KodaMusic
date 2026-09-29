@@ -1,4 +1,4 @@
-# Koda Anime TV — versão de teste 0.12
+# Koda Anime TV — versão de teste 0.13
 
 Projeto Android TV e celular em Java. Visual preto/branco/vermelho inspirado em `design/referencia-aprovada.png` (a imagem é apenas referência; a interface é nativa e interativa). Navegação com D-pad, catálogo, pesquisa com filtros, favoritos, histórico local, retomada, player e vinculação Google por código.
 

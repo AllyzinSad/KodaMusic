@@ -11,11 +11,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
-final class AnimeRowAdapter extends RecyclerView.Adapter<AnimeRowAdapter.Holder> {
-    interface Listener { void onSelected(Anime anime); void onFocused(Anime anime); }
+public final class AnimeRowAdapter extends RecyclerView.Adapter<AnimeRowAdapter.Holder> {
+    public interface OnAnimeSelectedListener { default void onSelected(Anime anime) {} void onAnimeFocused(Anime anime); }
     private final List<Anime> items=new ArrayList<>();
-    private final Listener listener;
-    AnimeRowAdapter(Listener listener){this.listener=listener;}
+    private final OnAnimeSelectedListener listener;
+    public AnimeRowAdapter(List<Anime> animeList,OnAnimeSelectedListener listener){this.listener=listener;this.items.addAll(animeList);}
     void submit(List<Anime> data){items.clear();items.addAll(data);notifyDataSetChanged();}
     @Override public int getItemCount(){return items.size();}
     @NonNull @Override public Holder onCreateViewHolder(@NonNull ViewGroup parent,int type){
@@ -24,17 +24,17 @@ final class AnimeRowAdapter extends RecyclerView.Adapter<AnimeRowAdapter.Holder>
     @Override public void onBindViewHolder(@NonNull Holder holder,int position){
         Anime anime=items.get(position);
         holder.image.setTag(null);holder.image.setImageDrawable(null);
-        holder.title.setText(anime.title);
+        holder.title.setText(anime.getName());
         holder.title.setTextColor(holder.itemView.hasFocus()?0xFFFF7849:0xFFFFFFFF);
         holder.itemView.setTranslationZ(holder.itemView.hasFocus()?8f:0f);
-        String audio=anime.title.toLowerCase(Locale.ROOT).contains("dublado")?"DUB":"LEG";
+        String audio=anime.isDubbed()?"DUB":"LEG";
         holder.audio.setText(audio);holder.itemView.setContentDescription(anime.title+", "+audio);
         Net.image(anime.poster,holder.image);
         holder.itemView.setOnClickListener(v->listener.onSelected(anime));
         holder.itemView.setOnFocusChangeListener((v,focused)->{
             holder.title.setTextColor(focused?0xFFFF7849:0xFFFFFFFF);
             v.setTranslationZ(focused?8f:0f);
-            if(focused)listener.onFocused(anime);
+            if(focused)listener.onAnimeFocused(anime);
         });
     }
     @Override public void onViewRecycled(@NonNull Holder holder){
@@ -43,6 +43,6 @@ final class AnimeRowAdapter extends RecyclerView.Adapter<AnimeRowAdapter.Holder>
     }
     static final class Holder extends RecyclerView.ViewHolder {
         final ImageView image;final TextView title,audio;
-        Holder(View view){super(view);image=view.findViewById(R.id.anime_poster);title=view.findViewById(R.id.anime_title);audio=view.findViewById(R.id.anime_audio);}
+        Holder(View view){super(view);image=view.findViewById(R.id.anime_image);title=view.findViewById(R.id.anime_name);audio=view.findViewById(R.id.anime_audio_tag);}
     }
 }

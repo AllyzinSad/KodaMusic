@@ -52,23 +52,19 @@ public final class MainActivity extends androidx.appcompat.app.AppCompatActivity
         FrameLayout viewport=new FrameLayout(this);viewport.setBackgroundColor(BLACK);
         View home=getLayoutInflater().inflate(R.layout.activity_main,viewport,false);
         viewport.addView(home,screenFit.centered());setContentView(viewport);
-        View hero=home.findViewById(R.id.hero_container);
-        home.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob)->{
-            int desired=Math.round((b-t)*.60f);
-            if(desired>0 && hero.getLayoutParams().height!=desired){ViewGroup.LayoutParams params=hero.getLayoutParams();params.height=desired;hero.setLayoutParams(params);}
-        });
         home.findViewById(R.id.nav_search).setOnClickListener(v->showSearch());
         home.findViewById(R.id.nav_favorites).setOnClickListener(v->showFavorites());
         home.findViewById(R.id.nav_history).setOnClickListener(v->showHistory());
         home.findViewById(R.id.nav_settings).setOnClickListener(v->showSettings());
-        Button watch=home.findViewById(R.id.btn_watch),more=home.findViewById(R.id.btn_more_info);
+        Button watch=home.findViewById(R.id.btn_play),more=home.findViewById(R.id.btn_info);
         watch.setEnabled(false);more.setEnabled(false);
+        watch.setOnFocusChangeListener((v,focused)->{v.setScaleX(focused?1.04f:1f);v.setScaleY(focused?1.04f:1f);v.setElevation(focused?dp(6):0);});
         watch.setOnClickListener(v->watchHero(home,generation));
         more.setOnClickListener(v->{if(heroAnime!=null)details(heroAnime);});
         home.findViewById(R.id.btn_retry).setOnClickListener(v->showHome());
-        AnimeRowAdapter.Listener listener=new AnimeRowAdapter.Listener(){
+        AnimeRowAdapter.OnAnimeSelectedListener listener=new AnimeRowAdapter.OnAnimeSelectedListener(){
             @Override public void onSelected(Anime anime){details(anime);}
-            @Override public void onFocused(Anime anime){if(screenGeneration==generation)updateHero(home,anime);}
+            @Override public void onAnimeFocused(Anime anime){if(screenGeneration==generation)updateHero(home,anime);}
         };
         AnimeRowAdapter recommendations=setupHomeRow(home,R.id.rv_catalog_row,listener);
         AnimeRowAdapter recent=setupHomeRow(home,R.id.rv_recent_row,listener);
@@ -88,25 +84,25 @@ public final class MainActivity extends androidx.appcompat.app.AppCompatActivity
             if(error!=null || list.isEmpty())((TextView)home.findViewById(R.id.recent_row_title)).setText("Lançamentos indisponíveis no momento");
         });
     }
-    private AnimeRowAdapter setupHomeRow(View home,int id,AnimeRowAdapter.Listener listener){
+    private AnimeRowAdapter setupHomeRow(View home,int id,AnimeRowAdapter.OnAnimeSelectedListener listener){
         androidx.recyclerview.widget.RecyclerView row=home.findViewById(id);
         row.setLayoutManager(new androidx.recyclerview.widget.LinearLayoutManager(this,androidx.recyclerview.widget.LinearLayoutManager.HORIZONTAL,false));
         row.setNestedScrollingEnabled(false);row.setItemAnimator(null);
-        AnimeRowAdapter adapter=new AnimeRowAdapter(listener);row.setAdapter(adapter);return adapter;
+        AnimeRowAdapter adapter=new AnimeRowAdapter(new ArrayList<>(),listener);row.setAdapter(adapter);return adapter;
     }
     private void updateHero(View home,Anime anime){
         if(heroAnime==anime)return;
         heroAnime=anime;
         ((TextView)home.findViewById(R.id.hero_title)).setText(anime.title);
-        ((TextView)home.findViewById(R.id.hero_synopsis)).setText(anime.description.isEmpty()?"Abra Mais Informações para consultar os episódios e versões disponíveis.":anime.description);
+        ((TextView)home.findViewById(R.id.hero_description)).setText(anime.description.isEmpty()?"Abra Mais Informações para consultar os episódios e versões disponíveis.":anime.description);
         ImageView banner=home.findViewById(R.id.hero_banner);banner.setTag(null);banner.setImageDrawable(null);Net.image(anime.poster,banner);
-        Button watch=home.findViewById(R.id.btn_watch);watch.setEnabled(true);watch.setText("Assistir");
+        Button watch=home.findViewById(R.id.btn_play);watch.setEnabled(true);watch.setText("Assistir");
         for(WatchHistory.Entry entry:WatchHistory.all(this))if(entry.animeId.equals(historyId(anime))&&!entry.watched()){watch.setText("Continuar");break;}
-        home.findViewById(R.id.btn_more_info).setEnabled(true);
+        home.findViewById(R.id.btn_info).setEnabled(true);
     }
     private void watchHero(View home,int generation){
         final Anime anime=heroAnime;if(anime==null)return;
-        Button watch=home.findViewById(R.id.btn_watch);watch.setEnabled(false);watch.setText("Carregando…");
+        Button watch=home.findViewById(R.id.btn_play);watch.setEnabled(false);watch.setText("Carregando…");
         Catalog.episodes(anime,(episodes,error)->{
             if(generation!=screenGeneration || heroAnime!=anime)return;
             watch.setEnabled(true);watch.setText("Assistir");

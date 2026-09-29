@@ -68,3 +68,11 @@ substitui validação em Android TV físico.
 ## Identidade Koda 0.12
 
 Azul da meia-noite #0A0A12, névoa nas bordas/base do hero e centro transparente. Fundo do card recebe destaque discreto no foco, com duas bordas translúcidas de brilho simulado. Título permanece abaixo do pôster. MainActivity.updateHero atualiza texto e imagem ao receber onFocused do adapter; guardas de geração impedem respostas de telas anteriores. O mesmo anime focado novamente não dispara download redundante do banner.
+
+## Integração dos trechos enviados — 0.13
+
+Aplicados IDs hero_description, btn_play, btn_info, card_poster_container, anime_image, anime_audio_tag e anime_name. Banner agora usa constraint percentual 0.60 diretamente no XML; informações ficam ancoradas à base dele. Degradê primário exato: #FF6600 → #B30914, 45 graus, raio 4dp. Adapter recebe List<Anime> tipada e OnAnimeSelectedListener; Anime fornece getName/getDescription/isDubbed.
+
+Correções necessárias nos trechos: namespaces Android/res-auto válidos; layout_constraintBottom_toBottomOf; nomes de classe sem barras de escape; tema XML completo em vez de três linhas de cores. Catalog.getAnimes() não existe no projeto: foi mantida a consulta assíncrona real e seu cache. Mantidos os eventos de clique, imagens, busca/favoritos/histórico e player.
+
+O trilho inferior permite rolagem vertical para os cards 2:3 caberem em telas HD. Botão principal recebe realce por escala/elevação no foco sem alterar o drawable de degradê fornecido. A validação estática/compilação não comprova funcionamento perfeito do controle remoto; necessário testar em TV física.
