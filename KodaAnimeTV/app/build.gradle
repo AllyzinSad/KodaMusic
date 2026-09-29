@@ -6,8 +6,8 @@ android {
         applicationId 'com.koda.anime.tv'
         minSdk 23
         targetSdk 35
-        versionCode 18
-        versionName '0.17.1-hotfix'
+        versionCode 19
+        versionName '0.18'
     }
     compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
 }
