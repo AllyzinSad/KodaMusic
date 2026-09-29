@@ -12,7 +12,7 @@ import android.widget.*;
 import java.util.*;
 
 public final class MainActivity extends androidx.appcompat.app.AppCompatActivity {
-    private static final int BLACK=0xFF08080A, SIDE=0xFF0E0E12, RED=0xFFFF1635, RED_DARK=0xFF9E001B, WHITE=0xFFFFFFFF, MUTED=0xFFB8B8C0;
+    private static final int BLACK=0xFF08080A, SIDE=0xFF0E0E12, RED=0xFFFF1635, RED_DARK=0xFF9E001B, WHITE=0xFFFFFFFF, MUTED=0xFFB8B8C0; private static final String VERSION="0.15-redesign";
     private LinearLayout content,nav; private String page="Início"; private boolean playerOpened; private Anime selectedAnime; private String returnPage="Início",detailFocus=""; private int searchGeneration; private final Map<String,Anime> seen=new LinkedHashMap<>();
     private Anime heroAnime; private ImageView homeHeroImage; private TextView homeHeroTitle,homeHeroDescription,homeHeroWatch;
     private final ArrayList<TextView> navButtons=new ArrayList<>();
@@ -366,7 +366,7 @@ public final class MainActivity extends androidx.appcompat.app.AppCompatActivity
         settingsChoice("◖","Áudio","Idioma de áudio padrão","Japonês (Original)");
         settingsChoice("▤","Legendas","Idioma das legendas padrão","Português (Brasil)");
         settingsAction("◷","Histórico","Gerencie seu histórico de reprodução.","Limpar",()->{getSharedPreferences("watch_history",0).edit().clear().apply();Toast.makeText(this,"Histórico limpo.",Toast.LENGTH_SHORT).show();});
-        settingsAction("ⓘ","Sobre o aplicativo","Koda Anime TV · versão "+BuildConfig.VERSION_NAME,"Detalhes",()->new AlertDialog.Builder(this).setTitle("Koda Anime TV").setMessage("Versão "+BuildConfig.VERSION_NAME+"\nInterface para Android TV.").setPositiveButton("OK",null).show());
+        settingsAction("ⓘ","Sobre o aplicativo","Koda Anime TV · versão "+VERSION,"Detalhes",()->new AlertDialog.Builder(this).setTitle("Koda Anime TV").setMessage("Versão "+VERSION+"\nInterface para Android TV.").setPositiveButton("OK",null).show());
     }
     private void settingsToggle(String icon,String title,String desc,String key,boolean def,android.content.SharedPreferences prefs){
         LinearLayout card=settingsCard(icon,title,desc);Switch toggle=new Switch(this);toggle.setChecked(prefs.getBoolean(key,def));toggle.setOnCheckedChangeListener((b,on)->prefs.edit().putBoolean(key,on).apply());card.addView(toggle,new LinearLayout.LayoutParams(-2,-2));
