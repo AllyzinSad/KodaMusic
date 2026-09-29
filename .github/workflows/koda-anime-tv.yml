@@ -1,7 +1,7 @@
 name: Koda Anime TV APK
 on:
   push:
-    branches: [ koda-anime-tv-test ]
+    branches: [ koda-anime-tv-test, koda-anime-0.18 ]
   workflow_dispatch:
 jobs:
   build:
@@ -20,8 +20,20 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
-      - run: gradle -p KodaAnimeTV :app:testDebugUnitTest :app:assembleDebug --stacktrace
+      - name: Test and build
+        run: gradle -p KodaAnimeTV :app:testDebugUnitTest :app:assembleDebug --stacktrace
+      - name: Package complete source
+        run: |
+          rm -rf KodaAnimeTV/app/build KodaAnimeTV/.gradle
+          zip -r KodaAnimeTV-0.18-source.zip KodaAnimeTV \
+            -x "KodaAnimeTV/.git/*" \
+               "KodaAnimeTV/**/.gradle/*" \
+               "KodaAnimeTV/**/build/*"
       - uses: actions/upload-artifact@v4
         with:
-          name: KodaAnimeTV-debug-apk
+          name: KodaAnimeTV-0.18-apk
           path: KodaAnimeTV/app/build/outputs/apk/debug/app-debug.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: KodaAnimeTV-0.18-source
+          path: KodaAnimeTV-0.18-source.zip
