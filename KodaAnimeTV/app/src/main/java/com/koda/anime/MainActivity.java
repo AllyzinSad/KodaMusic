@@ -12,9 +12,9 @@ import android.widget.*;
 import java.util.*;
 
 public final class MainActivity extends androidx.appcompat.app.AppCompatActivity {
-    private static final int BLACK=0xFF08080A, SIDE=0xFF0E0E12, RED=0xFFFF1635, RED_DARK=0xFF9E001B, WHITE=0xFFFFFFFF, MUTED=0xFFB8B8C0; private static final String VERSION="0.19";
+    private static final int BLACK=0xFF08080A, SIDE=0xFF0E0E12, RED=0xFFFF1635, RED_DARK=0xFF9E001B, WHITE=0xFFFFFFFF, MUTED=0xFFB8B8C0; private static final String VERSION="0.19.1";
     private LinearLayout content,nav; private String page="Início"; private boolean playerOpened; private Anime selectedAnime; private String returnPage="Início",detailFocus=""; private int searchGeneration; private final Map<String,Anime> seen=new LinkedHashMap<>();
-    private Anime heroAnime; private ImageView homeHeroImage; private TextView homeHeroTitle,homeHeroDescription; private ImageButton homeHeroWatch;
+    private Anime heroAnime; private ImageView homeHeroImage; private TextView homeHeroTitle,homeHeroDescription,homeHeroWatch;
     private final ArrayList<TextView> navButtons=new ArrayList<>();
     @Override public void onCreate(Bundle state){super.onCreate(state);Net.initialize(this);ScreenFit.immersive(this);showHome();}
     private int screenGeneration;
@@ -62,11 +62,8 @@ public final class MainActivity extends androidx.appcompat.app.AppCompatActivity
         frame.addView(sc,new LinearLayout.LayoutParams(0,-1,1));
         content=column(); content.setClipChildren(false); content.setClipToPadding(false); pad(content,18,18,18,22); sc.addView(content);
 
-        // 0.19: use the approved red foliage as a real asset instead of drawn placeholder petals.
-        ImageView leavesTop=new ImageView(this);leavesTop.setImageDrawable(KodaSheets.single(this,R.drawable.koda_leaves));leavesTop.setScaleType(ImageView.ScaleType.CENTER_INSIDE);leavesTop.setAlpha(target.equals("Início")?.34f:.20f);leavesTop.setFocusable(false);
-        FrameLayout.LayoutParams leavesTopLp=new FrameLayout.LayoutParams(dp(128),dp(120),Gravity.TOP|Gravity.RIGHT);leavesTopLp.rightMargin=dp(4);leavesTopLp.topMargin=dp(4);viewport.addView(leavesTop,leavesTopLp);
-        ImageView leavesBottom=new ImageView(this);leavesBottom.setImageDrawable(KodaSheets.single(this,R.drawable.koda_leaves));leavesBottom.setScaleType(ImageView.ScaleType.CENTER_INSIDE);leavesBottom.setRotation(180f);leavesBottom.setAlpha(.18f);leavesBottom.setFocusable(false);
-        FrameLayout.LayoutParams leavesBottomLp=new FrameLayout.LayoutParams(dp(105),dp(112),Gravity.BOTTOM|Gravity.LEFT);leavesBottomLp.leftMargin=dp(4);leavesBottomLp.bottomMargin=dp(3);viewport.addView(leavesBottom,leavesBottomLp);
+        // 0.19.1: vector foliage keeps the approved red visual language sharp at any TV resolution.
+        KodaDecorView decor=new KodaDecorView(this);decor.setAlpha(target.equals("Início")?.58f:.34f);viewport.addView(decor,screenFit.centered());
         setContentView(viewport);
     }
 
@@ -123,10 +120,10 @@ public final class MainActivity extends androidx.appcompat.app.AppCompatActivity
         homeHeroDescription=label("Carregando catálogo…",14,0xFFD0D0D6,false); homeHeroDescription.setMaxLines(3); homeHeroDescription.setEllipsize(android.text.TextUtils.TruncateAt.END);
         LinearLayout.LayoutParams dlp=new LinearLayout.LayoutParams(-1,-2); dlp.topMargin=dp(8); info.addView(homeHeroDescription,dlp);
         LinearLayout actions=new LinearLayout(this); LinearLayout.LayoutParams alp=new LinearLayout.LayoutParams(-1,-2);alp.topMargin=dp(12);info.addView(actions,alp);
-        homeHeroWatch=sheetButton(R.drawable.koda_btn_assistir_sheet,()->watchHeroDirect(generation));homeHeroWatch.setEnabled(false);homeHeroWatch.setAlpha(.48f);
-        ImageButton more=sheetButton(R.drawable.koda_btn_info_sheet,()->{if(heroAnime!=null)details(heroAnime);});
-        LinearLayout.LayoutParams a1=new LinearLayout.LayoutParams(dp(168),dp(46));a1.rightMargin=dp(10);actions.addView(homeHeroWatch,a1);
-        actions.addView(more,new LinearLayout.LayoutParams(dp(198),dp(46)));
+        homeHeroWatch=premiumButton("Assistir",KodaIcon.PLAY,true,()->watchHeroDirect(generation));homeHeroWatch.setEnabled(false);homeHeroWatch.setAlpha(.48f);
+        TextView more=premiumButton("Mais informações",KodaIcon.INFO,false,()->{if(heroAnime!=null)details(heroAnime);});
+        LinearLayout.LayoutParams a1=new LinearLayout.LayoutParams(dp(170),dp(48));a1.rightMargin=dp(10);actions.addView(homeHeroWatch,a1);
+        actions.addView(more,new LinearLayout.LayoutParams(dp(205),dp(48)));
 
         sectionTitle("Lançados");
         androidx.recyclerview.widget.RecyclerView launched=rail();
@@ -208,9 +205,15 @@ public final class MainActivity extends androidx.appcompat.app.AppCompatActivity
         b.setOnFocusChangeListener((v,foc)->{b.setBackground(foc?outline(0xE62B0710,RED,8,2):bg(0xD91A1A20,8));b.setScaleX(foc?1.03f:1f);b.setScaleY(foc?1.03f:1f);});
         b.setOnClickListener(v->action.run());return b;
     }
-    private ImageButton sheetButton(int sheetRes,Runnable action){
-        ImageButton b=new ImageButton(this);b.setImageDrawable(KodaSheets.pair(this,sheetRes,false));b.setScaleType(ImageView.ScaleType.FIT_CENTER);b.setAdjustViewBounds(true);b.setPadding(0,0,0,0);b.setBackgroundColor(Color.TRANSPARENT);b.setFocusable(true);b.setClickable(true);
-        b.setOnFocusChangeListener((v,foc)->{b.setImageDrawable(KodaSheets.pair(this,sheetRes,foc));b.animate().cancel();b.animate().scaleX(foc?1.045f:1f).scaleY(foc?1.045f:1f).setDuration(110).start();b.setElevation(foc?dp(9):0);});
+    private GradientDrawable premiumBg(boolean primary,boolean focus){
+        GradientDrawable d=new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,
+            focus?new int[]{0xFF4A0712,0xFF16080C}:primary?new int[]{0xFFFF1635,0xFFC90025}:new int[]{0xFF25252A,0xFF111115});
+        d.setCornerRadius(dp(10));d.setStroke(dp(focus?2:1),focus?RED:(primary?0xFFFF8394:0xFF3C3C43));return d;
+    }
+    private TextView premiumButton(String text,String iconKind,boolean primary,Runnable action){
+        TextView b=label(text,15,WHITE,true);b.setGravity(Gravity.CENTER);b.setSingleLine(true);b.setFocusable(true);b.setClickable(true);pad(b,16,0,18,0);b.setBackground(premiumBg(primary,false));
+        KodaIcon icon=new KodaIcon(iconKind,WHITE);icon.setBounds(0,0,dp(24),dp(24));b.setCompoundDrawables(icon,null,null,null);b.setCompoundDrawablePadding(dp(9));
+        b.setOnFocusChangeListener((v,foc)->{b.setBackground(premiumBg(primary,foc));b.animate().cancel();b.animate().scaleX(foc?1.045f:1f).scaleY(foc?1.045f:1f).setDuration(110).start();b.setElevation(foc?dp(10):0);});
         b.setOnClickListener(v->action.run());return b;
     }
     private void showSearch(){
@@ -323,7 +326,7 @@ public final class MainActivity extends androidx.appcompat.app.AppCompatActivity
         TextView synopsis=label(a.description.isEmpty()?"Sinopse não disponível nesta fonte.":a.description,16,MUTED,false);synopsis.setMaxLines(6);synopsis.setEllipsize(android.text.TextUtils.TruncateAt.END);
         LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(-1,-2);sp.topMargin=dp(13);info.addView(synopsis,sp);
         LinearLayout heroActions=new LinearLayout(this);LinearLayout.LayoutParams ap=new LinearLayout.LayoutParams(-1,-2);ap.topMargin=dp(15);info.addView(heroActions,ap);
-        ImageButton watchNow=sheetButton(R.drawable.koda_btn_assistir_sheet,()->playFirstEpisode(a));LinearLayout.LayoutParams watchLp=new LinearLayout.LayoutParams(dp(168),dp(46));watchLp.rightMargin=dp(10);heroActions.addView(watchNow,watchLp);
+        TextView watchNow=premiumButton("Assistir agora",KodaIcon.PLAY,true,()->playFirstEpisode(a));LinearLayout.LayoutParams watchLp=new LinearLayout.LayoutParams(dp(176),dp(48));watchLp.rightMargin=dp(10);heroActions.addView(watchNow,watchLp);
         addDetailAction(heroActions,button(isFavorite(a)?"♥  Favorito":"♡  Favoritar",()->{toggleFavorite(a);showDetail(a);}));
         WatchHistory.Entry previous=null;for(WatchHistory.Entry e:WatchHistory.all(this))if(e.animeId.equals(historyId(a))){previous=e;break;}
         if(previous!=null){WatchHistory.Entry h=previous;addDetailAction(heroActions,button("▶  Continuar "+h.episode,()->play(a,h.episode,h.url,"","",h.position)));}
