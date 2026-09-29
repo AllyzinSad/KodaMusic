@@ -13,16 +13,16 @@ import androidx.media3.ui.PlayerView;
 import java.util.*;
 
 public final class PlayerActivity extends Activity {
-    private static final int WHITE=0xFFF7F7F9, RED=0xFFE7333E;
+    private static final int WHITE=0xFFFFFFFF, RED=0xFFFF1635;
     private final Handler handler=new Handler(Looper.getMainLooper());
-    private ExoPlayer player; private PlayerView video; private LinearLayout center,bottom; private TextView heading,playPause,quality,next,time;
+    private ExoPlayer player; private PlayerView video; private LinearLayout center,bottom; private TextView heading,playPause,quality,next,time,skip;
     private SeekBar progress; private View tap; private boolean tracking; private long startPosition,openingEndMs=-1;
     private String url,title,animeId,poster,episode,nextUrl,nextLabel;
     private ScreenFit screenFit;
     private int dp(int n){return screenFit.px(n);}
     private GradientDrawable bg(int color,int radius){GradientDrawable g=new GradientDrawable();g.setColor(color);g.setCornerRadius(dp(radius));return g;}
     private TextView control(String text,int size,Runnable action){TextView v=new TextView(this);v.setText(text);v.setTextColor(WHITE);v.setTextSize(size*screenFit.textScale(this));v.setGravity(Gravity.CENTER);v.setPadding(dp(14),dp(5),dp(14),dp(5));v.setBackground(bg(Color.TRANSPARENT,12));v.setFocusable(true);
-        v.setOnFocusChangeListener((view,focus)->{v.setBackground(bg(focus?0xCCAE263C:Color.TRANSPARENT,12));if(focus)showControls();});
+        v.setOnFocusChangeListener((view,focus)->{v.setBackground(bg(focus?0xCC7A0618:Color.TRANSPARENT,12));if(focus)showControls();});
         v.setOnClickListener(view->{action.run();showControls();});return v;}
     private void add(LinearLayout row,View v,int height){LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-2,dp(height));p.rightMargin=dp(11);row.addView(v,p);}
     @Override public void onCreate(Bundle state){super.onCreate(state);
@@ -34,13 +34,14 @@ public final class PlayerActivity extends Activity {
         video=new PlayerView(this);video.setUseController(false);root.addView(video,new FrameLayout.LayoutParams(-1,-1));
         tap=new View(this);tap.setFocusable(true);tap.setOnClickListener(v->showControls());root.addView(tap,new FrameLayout.LayoutParams(-1,-1));
         FrameLayout safeControls=new FrameLayout(this);root.addView(safeControls,screenFit.centered());
-        heading=new TextView(this);heading.setText((episode==null?"":episode)+"\n"+(title==null?"Koda Anime":title));heading.setTextColor(WHITE);heading.setTextSize(16*screenFit.textScale(this));heading.setPadding(dp(30),dp(15),dp(30),dp(15));heading.setBackgroundColor(0x9909090C);
-        safeControls.addView(heading,new FrameLayout.LayoutParams(-1,-2,Gravity.TOP));
+        ImageView logo=new ImageView(this);logo.setImageResource(R.mipmap.ic_launcher);logo.setScaleType(ImageView.ScaleType.CENTER_INSIDE);FrameLayout.LayoutParams logoLp=new FrameLayout.LayoutParams(dp(150),dp(72),Gravity.TOP|Gravity.LEFT);logoLp.leftMargin=dp(18);logoLp.topMargin=dp(8);safeControls.addView(logo,logoLp);
+        heading=new TextView(this);heading.setText((episode==null?"":episode)+"\n"+(title==null?"Koda Anime":title));heading.setTextColor(WHITE);heading.setTextSize(16*screenFit.textScale(this));heading.setPadding(dp(30),dp(15),dp(30),dp(15));heading.setBackgroundColor(0xA608080A);
+        FrameLayout.LayoutParams headLp=new FrameLayout.LayoutParams(dp(560),-2,Gravity.TOP|Gravity.LEFT);headLp.leftMargin=dp(24);headLp.topMargin=dp(72);safeControls.addView(heading,headLp);
         center=new LinearLayout(this);center.setGravity(Gravity.CENTER);FrameLayout.LayoutParams cp=new FrameLayout.LayoutParams(-1,-2,Gravity.CENTER);safeControls.addView(center,cp);
         add(center,control("↶\n10",24,()->seekBy(-10000)),70);
         playPause=control("❚❚",38,()->{if(player==null)return;if(player.isPlaying())player.pause();else player.play();update();});add(center,playPause,70);
         add(center,control("↷\n10",24,()->seekBy(10000)),70);
-        bottom=new LinearLayout(this);bottom.setOrientation(1);bottom.setPadding(dp(24),dp(12),dp(24),dp(16));bottom.setBackgroundColor(0xB609090C);
+        bottom=new LinearLayout(this);bottom.setOrientation(1);bottom.setPadding(dp(24),dp(12),dp(24),dp(16));bottom.setBackgroundColor(0xD008080A);
         FrameLayout.LayoutParams bp=new FrameLayout.LayoutParams(-1,-2,Gravity.BOTTOM);safeControls.addView(bottom,bp);
         LinearLayout seekRow=new LinearLayout(this);seekRow.setGravity(Gravity.CENTER_VERTICAL);bottom.addView(seekRow,new LinearLayout.LayoutParams(-1,dp(34)));
         time=new TextView(this);time.setTextColor(WHITE);time.setTextSize(13*screenFit.textScale(this));time.setText("00:00 / 00:00");seekRow.addView(time);
@@ -53,7 +54,9 @@ public final class PlayerActivity extends Activity {
         LinearLayout actions=new LinearLayout(this);actions.setGravity(Gravity.CENTER);bottom.addView(actions,new LinearLayout.LayoutParams(-1,dp(68)));
         quality=control("⚙\nQualidade: Auto",15,this::showQuality);actions.addView(quality,new LinearLayout.LayoutParams(0,dp(65),1));
         next=control("⏭\nPróximo episódio",15,this::playNext);actions.addView(next,new LinearLayout.LayoutParams(0,dp(65),1));next.setVisibility(nextUrl!=null&&nextUrl.startsWith("https://")?View.VISIBLE:View.GONE);
-        TextView skip=control("⏩\nPular abertura",15,()->{if(player!=null)seekTo(openingEndMs>0&&openingEndMs>player.getCurrentPosition()?openingEndMs:player.getCurrentPosition()+90000);});actions.addView(skip,new LinearLayout.LayoutParams(0,dp(65),1));
+        skip=control("⏩\nPular abertura",15,()->{if(player!=null&&openingEndMs>0&&openingEndMs>player.getCurrentPosition())seekTo(openingEndMs);});
+        actions.addView(skip,new LinearLayout.LayoutParams(0,dp(65),1));
+        skip.setVisibility(openingEndMs>0?View.VISIBLE:View.GONE);
         showControls();handler.post(updateLoop);
     }
     private String format(long ms){long s=Math.max(0,ms)/1000;return String.format(Locale.ROOT,"%02d:%02d",s/60,s%60);}
@@ -61,6 +64,7 @@ public final class PlayerActivity extends Activity {
     private final Runnable updateLoop=new Runnable(){@Override public void run(){update();handler.postDelayed(this,600);}};
     private void showControls(){heading.setVisibility(View.VISIBLE);center.setVisibility(View.VISIBLE);bottom.setVisibility(View.VISIBLE);handler.removeCallbacks(hide);handler.postDelayed(hide,4500);}
     private void update(){if(player==null)return;long pos=player.getCurrentPosition(),dur=player.getDuration();playPause.setText(player.isPlaying()?"❚❚":"▶");
+        if(skip!=null)skip.setVisibility(openingEndMs>0&&pos<openingEndMs?View.VISIBLE:View.GONE);
         if(!tracking){time.setText(format(pos)+" / "+format(dur));progress.setProgress(dur>0?(int)Math.min(1000,pos*1000/dur):0);}
     }
     @Override protected void onStart(){super.onStart();if(url==null||player!=null)return;
