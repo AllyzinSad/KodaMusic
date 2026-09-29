@@ -12,8 +12,9 @@ import android.widget.*;
 import java.util.*;
 
 public final class MainActivity extends androidx.appcompat.app.AppCompatActivity {
-    private static final int BLACK=0xFF0A0A12, SIDE=0xFF101013, RED=0xFFE7333E, WHITE=0xFFF7F7F9, MUTED=0xFFB9B9C2;
+    private static final int BLACK=0xFF08080A, SIDE=0xFF0E0E12, RED=0xFFFF1635, RED_DARK=0xFF9E001B, WHITE=0xFFFFFFFF, MUTED=0xFFB8B8C0;
     private LinearLayout content,nav; private String page="Início"; private boolean playerOpened; private Anime selectedAnime; private String returnPage="Início",detailFocus=""; private int searchGeneration; private final Map<String,Anime> seen=new LinkedHashMap<>();
+    private Anime heroAnime; private ImageView homeHeroImage; private TextView homeHeroTitle,homeHeroDescription,homeHeroWatch;
     private final ArrayList<TextView> navButtons=new ArrayList<>();
     @Override public void onCreate(Bundle state){super.onCreate(state);Net.initialize(this);getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,WindowManager.LayoutParams.FLAG_FULLSCREEN);showHome();}
     private int screenGeneration;
@@ -24,133 +25,208 @@ public final class MainActivity extends androidx.appcompat.app.AppCompatActivity
     private TextView label(String text,int size,int color,boolean bold){TextView t=new TextView(this);t.setText(text);t.setTextSize(size*uiScale());t.setTextColor(color);if(bold)t.setTypeface(null,Typeface.BOLD);return t;}
     private LinearLayout column(){LinearLayout l=new LinearLayout(this);l.setOrientation(1);return l;}
     private void pad(View v,int a,int b,int c,int d){v.setPadding(dp(a),dp(b),dp(c),dp(d));}
-    private void shell(String target){screenGeneration++;Net.clearImageQueue();page=target;navButtons.clear();LinearLayout frame=new LinearLayout(this);frame.setBackground(new GradientDrawable(GradientDrawable.Orientation.TR_BL,new int[]{0xFF211015,BLACK,BLACK}));FrameLayout viewport=new FrameLayout(this);viewport.setBackgroundColor(BLACK);screenFit=new ScreenFit(this);viewport.addView(frame,screenFit.centered());setContentView(viewport);
-        nav=column();nav.setBackgroundColor(SIDE);pad(nav,18,23,14,22);frame.addView(nav,new LinearLayout.LayoutParams(dp(190),-1));
-        LinearLayout brand=new LinearLayout(this);brand.setGravity(Gravity.CENTER_VERTICAL);
-        ImageView mark=new ImageView(this);mark.setImageResource(com.koda.anime.R.mipmap.ic_launcher);brand.addView(mark,new LinearLayout.LayoutParams(dp(36),dp(36)));
-        TextView name=label("  Koda",19,WHITE,true);brand.addView(name);brand.addView(label(" Anime",19,RED,true));
-        nav.addView(brand,new LinearLayout.LayoutParams(-1,dp(62)));
-        navItem("Início","⌂",()->showHome());navItem("Pesquisa","⌕",()->showSearch());navItem("Favoritos","♡",()->showFavorites());navItem("Histórico","◷",()->showHistory());
-        View spacer=new View(this);nav.addView(spacer,new LinearLayout.LayoutParams(1,0,1));
-        navItem("Configurações","⚙",()->showSettings());
-        ScrollView sc=new ScrollView(this);sc.setFillViewport(true);frame.addView(sc,new LinearLayout.LayoutParams(0,-1,1));
-        content=column();pad(content,22,30,12,24);sc.addView(content);
+    private void shell(String target){
+        screenGeneration++; Net.clearImageQueue(); page=target; navButtons.clear();
+        FrameLayout viewport=new FrameLayout(this); viewport.setBackgroundColor(BLACK); screenFit=new ScreenFit(this);
+
+        ImageView backdrop=new ImageView(this); backdrop.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        backdrop.setImageResource(R.drawable.tv_banner); backdrop.setAlpha(.22f);
+        viewport.addView(backdrop,screenFit.centered());
+
+        View shade=new View(this);
+        shade.setBackground(new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,new int[]{0xF708080A,0xE608080A,0xB008080A,0xD908080A}));
+        viewport.addView(shade,screenFit.centered());
+
+        LinearLayout frame=new LinearLayout(this); frame.setOrientation(LinearLayout.HORIZONTAL); frame.setBackgroundColor(Color.TRANSPARENT);
+        viewport.addView(frame,screenFit.centered());
+
+        nav=column(); nav.setBackgroundColor(0xF20B0B0E); pad(nav,16,18,12,18);
+        frame.addView(nav,new LinearLayout.LayoutParams(dp(168),-1));
+
+        ImageView brand=new ImageView(this); brand.setImageResource(R.mipmap.ic_launcher); brand.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+        LinearLayout.LayoutParams brandLp=new LinearLayout.LayoutParams(-1,dp(82)); brandLp.bottomMargin=dp(8); nav.addView(brand,brandLp);
+
+        navItem("Início","",this::showHome);
+        navItem("Lançados","",this::showLaunches);
+        navItem("Recomendados","",this::showRecommended);
+        navItem("Histórico","",this::showHistory);
+
+        View divider=new View(this); divider.setBackgroundColor(0xFF2A2A30);
+        LinearLayout.LayoutParams divLp=new LinearLayout.LayoutParams(-1,dp(1)); divLp.topMargin=dp(3); divLp.bottomMargin=dp(10); nav.addView(divider,divLp);
+
+        navItem("Pesquisa","",this::showSearch);
+        navItem("Favoritos","",this::showFavorites);
+        navItem("Configurações","",this::showSettings);
+
+        ScrollView sc=new ScrollView(this); sc.setFillViewport(true); sc.setClipToPadding(false); sc.setVerticalScrollBarEnabled(false);
+        frame.addView(sc,new LinearLayout.LayoutParams(0,-1,1));
+        content=column(); content.setClipChildren(false); content.setClipToPadding(false); pad(content,18,18,18,22); sc.addView(content);
+
+        viewport.addView(new PetalOverlay(this),screenFit.centered());
+        setContentView(viewport);
     }
-    private void navItem(String name,String icon,Runnable action){TextView v=label(name,14,page.equals(name)?WHITE:MUTED,page.equals(name));v.setGravity(Gravity.CENTER_VERTICAL);pad(v,13,0,6,0);
-        NavIcon glyph=new NavIcon(name,page.equals(name)?WHITE:MUTED);glyph.setBounds(0,0,dp(21),dp(21));v.setCompoundDrawables(glyph,null,null,null);v.setCompoundDrawablePadding(dp(13));
-        v.setBackground(page.equals(name)?new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,new int[]{0xFFFF263D,0xFF9B142A}):bg(SIDE,8));if(v.getBackground() instanceof GradientDrawable)((GradientDrawable)v.getBackground()).setCornerRadius(dp(8));v.setFocusable(true);
-        v.setOnFocusChangeListener((view,focus)->{v.setBackground(bg(focus?0xFFBF1B32:page.equals(name)?0xFFB7182D:SIDE,8));glyph.setTintColor(focus?WHITE:page.equals(name)?WHITE:MUTED);});
-        v.setOnClickListener(x->action.run());LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,dp(38));p.bottomMargin=dp(12);nav.addView(v,p);navButtons.add(v);
+
+    private void navItem(String name,String icon,Runnable action){
+        boolean selected=page.equals(name);
+        TextView v=label(name,14,selected?WHITE:MUTED,selected); v.setGravity(Gravity.CENTER_VERTICAL); pad(v,12,0,8,0);
+        NavIcon glyph=new NavIcon(name,selected?WHITE:MUTED); glyph.setBounds(0,0,dp(21),dp(21));
+        v.setCompoundDrawables(glyph,null,null,null); v.setCompoundDrawablePadding(dp(12)); v.setFocusable(true);
+        v.setBackground(selected?outline(0xB3210710,RED,8,1):bg(Color.TRANSPARENT,8));
+        v.setOnFocusChangeListener((view,focus)->{
+            v.setTextColor(focus||selected?WHITE:MUTED);
+            v.setBackground(focus?outline(0xD02D0611,RED,8,2):selected?outline(0xB3210710,RED,8,1):bg(Color.TRANSPARENT,8));
+            glyph.setTintColor(focus||selected?WHITE:MUTED);
+            if(focus){v.setScaleX(1.025f);v.setScaleY(1.025f);}else{v.setScaleX(1f);v.setScaleY(1f);}
+        });
+        v.setOnClickListener(x->action.run());
+        LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,dp(42)); p.bottomMargin=dp(7); nav.addView(v,p); navButtons.add(v);
     }
+
     private GradientDrawable outline(int fill,int stroke,int radius,int width){GradientDrawable d=bg(fill,radius);d.setStroke(dp(width),stroke);return d;}
-    private TextView heading(String title){TextView t=label(title,20,WHITE,true);LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,-2);p.topMargin=dp(25);p.bottomMargin=dp(10);content.addView(t,p);return t;}
-    private Anime heroAnime;
-    private void showHome(){
-        screenGeneration++;Net.clearImageQueue();page="Início";navButtons.clear();heroAnime=null;
-        final int generation=screenGeneration;
-        screenFit=new ScreenFit(this);
-        FrameLayout viewport=new FrameLayout(this);viewport.setBackgroundColor(BLACK);
-        View home=getLayoutInflater().inflate(R.layout.activity_main,viewport,false);
-        viewport.addView(home,screenFit.centered());setContentView(viewport);
-        home.findViewById(R.id.nav_search).setOnClickListener(v->showSearch());
-        home.findViewById(R.id.nav_favorites).setOnClickListener(v->showFavorites());
-        home.findViewById(R.id.nav_history).setOnClickListener(v->showHistory());
-        home.findViewById(R.id.nav_settings).setOnClickListener(v->showSettings());
-        Button watch=home.findViewById(R.id.btn_play),more=home.findViewById(R.id.btn_info);
-        watch.setEnabled(false);more.setEnabled(false);
-        watch.setOnFocusChangeListener((v,focused)->{v.setScaleX(focused?1.04f:1f);v.setScaleY(focused?1.04f:1f);v.setElevation(focused?dp(6):0);});
-        watch.setOnClickListener(v->watchHero(home,generation));
-        more.setOnClickListener(v->{if(heroAnime!=null)details(heroAnime);});
-        home.findViewById(R.id.btn_retry).setOnClickListener(v->showHome());
-        AnimeRowAdapter.OnAnimeSelectedListener listener=new AnimeRowAdapter.OnAnimeSelectedListener(){
-            @Override public void onSelected(Anime anime){details(anime);}
-            @Override public void onAnimeFocused(Anime anime){if(screenGeneration==generation)updateHero(home,anime);}
-        };
-        AnimeRowAdapter recommendations=setupHomeRow(home,R.id.rv_catalog_row,listener);
-        AnimeRowAdapter recent=setupHomeRow(home,R.id.rv_recent_row,listener);
-        TextView status=home.findViewById(R.id.catalog_status);
-        home.findViewById(R.id.nav_search).requestFocus();
-        Catalog.recommendations((list,error)->{
-            if(generation!=screenGeneration)return;
-            if(error!=null || list.isEmpty()){
-                status.setText("Não foi possível carregar as recomendações.");home.findViewById(R.id.btn_retry).setVisibility(View.VISIBLE);return;
-            }
-            recommendations.submit(list);for(Anime anime:list)seen.put(anime.id,anime);
-            status.setVisibility(View.GONE);if(heroAnime==null)updateHero(home,list.get(0));
-        });
-        Catalog.recent((list,error)->{
-            if(generation!=screenGeneration)return;
-            recent.submit(list);
-            if(error!=null || list.isEmpty())((TextView)home.findViewById(R.id.recent_row_title)).setText("Lançamentos indisponíveis no momento");
-        });
-    }
-    private AnimeRowAdapter setupHomeRow(View home,int id,AnimeRowAdapter.OnAnimeSelectedListener listener){
-        androidx.recyclerview.widget.RecyclerView row=home.findViewById(id);
+    private TextView heading(String title){TextView t=label(title,20,WHITE,true);LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,-2);p.topMargin=dp(18);p.bottomMargin=dp(9);content.addView(t,p);return t;}
+    private TextView sectionTitle(String title){LinearLayout row=new LinearLayout(this);row.setGravity(Gravity.CENTER_VERTICAL);View accent=new View(this);accent.setBackgroundColor(RED);row.addView(accent,new LinearLayout.LayoutParams(dp(4),dp(22)));TextView t=label(title,18,WHITE,true);LinearLayout.LayoutParams tp=new LinearLayout.LayoutParams(0,-2,1);tp.leftMargin=dp(10);row.addView(t,tp);LinearLayout.LayoutParams rp=new LinearLayout.LayoutParams(-1,-2);rp.topMargin=dp(12);rp.bottomMargin=dp(7);content.addView(row,rp);return t;}
+    private androidx.recyclerview.widget.RecyclerView rail(){
+        androidx.recyclerview.widget.RecyclerView row=new androidx.recyclerview.widget.RecyclerView(this);
         row.setLayoutManager(new androidx.recyclerview.widget.LinearLayoutManager(this,androidx.recyclerview.widget.LinearLayoutManager.HORIZONTAL,false));
-        row.setNestedScrollingEnabled(false);row.setItemAnimator(null);
+        row.setNestedScrollingEnabled(false); row.setItemAnimator(null); row.setClipToPadding(false); row.setClipChildren(false);
+        LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,dp(214)); lp.bottomMargin=dp(4); content.addView(row,lp); return row;
+    }
+    private AnimeRowAdapter attachRail(androidx.recyclerview.widget.RecyclerView row,AnimeRowAdapter.OnAnimeSelectedListener listener){
         AnimeRowAdapter adapter=new AnimeRowAdapter(new ArrayList<>(),listener);row.setAdapter(adapter);return adapter;
     }
-    private void updateHero(View home,Anime anime){
-        if(heroAnime==anime)return;
-        heroAnime=anime;
-        ((TextView)home.findViewById(R.id.hero_title)).setText(anime.title);
-        ((TextView)home.findViewById(R.id.hero_description)).setText(anime.description.isEmpty()?"Abra Mais Informações para consultar os episódios e versões disponíveis.":anime.description);
-        ImageView banner=home.findViewById(R.id.hero_banner);banner.setTag(null);banner.setImageDrawable(null);Net.image(anime.poster,banner);
-        Button watch=home.findViewById(R.id.btn_play);watch.setEnabled(true);watch.setText("Assistir");
-        for(WatchHistory.Entry entry:WatchHistory.all(this))if(entry.animeId.equals(historyId(anime))&&!entry.watched()){watch.setText("Continuar");break;}
-        home.findViewById(R.id.btn_info).setEnabled(true);
+    private void showHome(){
+        shell("Início"); heroAnime=null; final int generation=screenGeneration;
+
+        FrameLayout hero=new FrameLayout(this); hero.setClipToOutline(true); hero.setBackground(bg(0xFF111116,14));
+        LinearLayout.LayoutParams hp=new LinearLayout.LayoutParams(-1,dp(245)); hp.bottomMargin=dp(5); content.addView(hero,hp);
+
+        homeHeroImage=new ImageView(this); homeHeroImage.setScaleType(ImageView.ScaleType.CENTER_CROP); homeHeroImage.setImageResource(R.drawable.tv_banner);
+        hero.addView(homeHeroImage,new FrameLayout.LayoutParams(-1,-1));
+        View scrim=new View(this); scrim.setBackground(new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,new int[]{0xF508080A,0xD908080A,0x4008080A,0x2208080A}));
+        hero.addView(scrim,new FrameLayout.LayoutParams(-1,-1));
+
+        LinearLayout info=column(); pad(info,22,18,18,16);
+        FrameLayout.LayoutParams ip=new FrameLayout.LayoutParams(dp(500),-1,Gravity.LEFT); hero.addView(info,ip);
+        TextView eyebrow=label("SÉRIE EM DESTAQUE",11,RED,true); eyebrow.setLetterSpacing(.18f); info.addView(eyebrow);
+        homeHeroTitle=label("Koda Anime",38,WHITE,true); homeHeroTitle.setTypeface(Typeface.SERIF,Typeface.BOLD); homeHeroTitle.setMaxLines(2);
+        LinearLayout.LayoutParams titleLp=new LinearLayout.LayoutParams(-1,-2); titleLp.topMargin=dp(3); info.addView(homeHeroTitle,titleLp);
+        TextView meta=label("HD   |   Anime   |   Dublado e Legendado",12,0xFFE1E1E6,false); LinearLayout.LayoutParams mlp=new LinearLayout.LayoutParams(-1,-2);mlp.topMargin=dp(4);info.addView(meta,mlp);
+        homeHeroDescription=label("Carregando catálogo…",14,0xFFD0D0D6,false); homeHeroDescription.setMaxLines(3); homeHeroDescription.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        LinearLayout.LayoutParams dlp=new LinearLayout.LayoutParams(-1,-2); dlp.topMargin=dp(8); info.addView(homeHeroDescription,dlp);
+        LinearLayout actions=new LinearLayout(this); LinearLayout.LayoutParams alp=new LinearLayout.LayoutParams(-1,-2);alp.topMargin=dp(12);info.addView(actions,alp);
+        homeHeroWatch=button("▶  Assistir",()->watchHeroDirect(generation)); homeHeroWatch.setEnabled(false);
+        TextView more=button("ⓘ  Mais informações",()->{if(heroAnime!=null)details(heroAnime);});
+        LinearLayout.LayoutParams a1=new LinearLayout.LayoutParams(dp(150),dp(46));a1.rightMargin=dp(10);actions.addView(homeHeroWatch,a1);
+        actions.addView(more,new LinearLayout.LayoutParams(dp(190),dp(46)));
+
+        sectionTitle("Lançados");
+        androidx.recyclerview.widget.RecyclerView launched=rail();
+        sectionTitle("Recomendados para você");
+        androidx.recyclerview.widget.RecyclerView recommended=rail();
+
+        AnimeRowAdapter.OnAnimeSelectedListener listener=new AnimeRowAdapter.OnAnimeSelectedListener(){
+            @Override public void onSelected(Anime anime){details(anime);}
+            @Override public void onAnimeFocused(Anime anime){if(screenGeneration==generation)updateHomeHero(anime);}
+        };
+        AnimeRowAdapter launchedAdapter=attachRail(launched,listener);
+        AnimeRowAdapter recommendedAdapter=attachRail(recommended,listener);
+
+        Catalog.recent((list,error)->{
+            if(generation!=screenGeneration)return;
+            launchedAdapter.submit(list); for(Anime a:list)seen.put(a.id,a);
+            if(heroAnime==null&&!list.isEmpty())updateHomeHero(list.get(0));
+        });
+        Catalog.recommendations((list,error)->{
+            if(generation!=screenGeneration)return;
+            recommendedAdapter.submit(list); for(Anime a:list)seen.put(a.id,a);
+            if(heroAnime==null&&!list.isEmpty())updateHomeHero(list.get(0));
+        });
+        if(!navButtons.isEmpty())navButtons.get(0).requestFocus();
     }
-    private void watchHero(View home,int generation){
-        final Anime anime=heroAnime;if(anime==null)return;
-        Button watch=home.findViewById(R.id.btn_play);watch.setEnabled(false);watch.setText("Carregando…");
+
+    private void updateHomeHero(Anime anime){
+        if(anime==null)return; heroAnime=anime;
+        homeHeroTitle.setText(anime.title);
+        homeHeroDescription.setText(anime.description.isEmpty()?"Descubra temporadas, episódios e versões disponíveis.":anime.description);
+        homeHeroImage.setTag(null); homeHeroImage.setImageResource(R.drawable.tv_banner); Net.image(anime.poster,homeHeroImage);
+        homeHeroWatch.setEnabled(true); homeHeroWatch.setText("▶  Assistir");
+        for(WatchHistory.Entry entry:WatchHistory.all(this))if(entry.animeId.equals(historyId(anime))&&!entry.watched()){homeHeroWatch.setText("▶  Continuar");break;}
+    }
+
+    private void watchHeroDirect(int generation){
+        final Anime anime=heroAnime;if(anime==null)return;homeHeroWatch.setEnabled(false);homeHeroWatch.setText("Carregando…");
         Catalog.episodes(anime,(episodes,error)->{
-            if(generation!=screenGeneration || heroAnime!=anime)return;
-            watch.setEnabled(true);watch.setText("Assistir");
+            if(generation!=screenGeneration||heroAnime!=anime)return;
+            homeHeroWatch.setEnabled(true);homeHeroWatch.setText("▶  Assistir");
             if(episodes.isEmpty()){Toast.makeText(this,"Escolha uma versão disponível na página do anime.",Toast.LENGTH_LONG).show();details(anime);return;}
             int index=0;long resume=0;
-            for(WatchHistory.Entry entry:WatchHistory.all(this)){
-                if(!entry.animeId.equals(historyId(anime))||entry.watched())continue;
-                for(int n=0;n<episodes.size();n++)if(episodes.get(n).description.equals(entry.episode)){index=n;resume=entry.position;break;}
-                break;
-            }
-            Anime episode=episodes.get(index);
-            play(anime,episode.description,episode.playUrl,index+1<episodes.size()?episodes.get(index+1).playUrl:"",index+1<episodes.size()?episodes.get(index+1).description:"",resume);
+            for(WatchHistory.Entry entry:WatchHistory.all(this)){if(!entry.animeId.equals(historyId(anime))||entry.watched())continue;for(int n=0;n<episodes.size();n++)if(episodes.get(n).description.equals(entry.episode)){index=n;resume=entry.position;break;}break;}
+            Anime ep=episodes.get(index);play(anime,ep.description,ep.playUrl,index+1<episodes.size()?episodes.get(index+1).playUrl:"",index+1<episodes.size()?episodes.get(index+1).description:"",resume);
         });
     }
+
+    private void showLaunches(){showCollection("Lançados","LANÇADOS","Novos episódios e títulos adicionados recentemente.",true);}
+    private void showRecommended(){showCollection("Recomendados","RECOMENDADOS","Seleção em destaque para descobrir o que assistir agora.",false);}
+    private void showCollection(String pageName,String eyebrow,String subtitle,boolean recent){
+        shell(pageName);TextView e=label(eyebrow,12,RED,true);e.setLetterSpacing(.18f);content.addView(e);
+        TextView title=label(pageName,38,WHITE,true);title.setTypeface(Typeface.SERIF,Typeface.BOLD);content.addView(title);
+        TextView sub=label(subtitle,15,MUTED,false);LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(-1,-2);sp.bottomMargin=dp(14);content.addView(sub,sp);
+        sectionTitle(pageName);
+        androidx.recyclerview.widget.RecyclerView list=rail();
+        AnimeRowAdapter adapter=attachRail(list,new AnimeRowAdapter.OnAnimeSelectedListener(){@Override public void onSelected(Anime anime){details(anime);}@Override public void onAnimeFocused(Anime anime){}});
+        Catalog.Result done=(items,error)->{adapter.submit(items);for(Anime a:items)seen.put(a.id,a);if(error!=null&&items.isEmpty())Toast.makeText(this,error,Toast.LENGTH_LONG).show();};
+        if(recent)Catalog.recent(done);else Catalog.recommendations(done);
+    }
+
     private LinearLayout row(){HorizontalScrollView scroll=new HorizontalScrollView(this);scroll.setHorizontalScrollBarEnabled(false);LinearLayout row=new LinearLayout(this);row.setPadding(dp(2),dp(4),dp(2),dp(12));scroll.addView(row);content.addView(scroll,new LinearLayout.LayoutParams(-1,-2));return row;}
     private void cards(LinearLayout row,List<Anime> items,boolean large){for(Anime a:items){seen.put(a.id,a);row.addView(card(a,large));}}
-    private View card(Anime a,boolean large){int width=large?190:148,height=large?225:114;
-        FrameLayout tile=new FrameLayout(this);tile.setFocusable(true);tile.setBackground(bg(0xFF17171B,8));tile.setClipToOutline(true);
-        LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(dp(width),dp(height));lp.rightMargin=dp(10);tile.setLayoutParams(lp);
-        ImageView image=new ImageView(this);image.setScaleType(ImageView.ScaleType.CENTER_CROP);tile.addView(image,new FrameLayout.LayoutParams(-1,-1));Net.image(a.poster,image);
-        View shade=new View(this);shade.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,new int[]{0x00000000,0xA508090C,0xFA08090C}));
-        tile.addView(shade,new FrameLayout.LayoutParams(-1,dp(large?87:42),Gravity.BOTTOM));
-        LinearLayout caption=column();pad(caption,9,5,8,8);tile.addView(caption,new FrameLayout.LayoutParams(-1,-2,Gravity.BOTTOM));
-        TextView title=label(a.title,large?15:11,WHITE,true);title.setSingleLine(true);title.setEllipsize(android.text.TextUtils.TruncateAt.END);caption.addView(title);
-        String subtitle=large?(a.description.isEmpty()?a.genre:a.description.replaceAll("\\s+"," ")):a.id.startsWith("kitsu-")?"Informações · sem vídeo":a.id.startsWith("episode-")?Catalog.episodeLabel(a):a.genre;
-        TextView meta=label(subtitle,large?11:9,MUTED,false);meta.setSingleLine(true);meta.setEllipsize(android.text.TextUtils.TruncateAt.END);caption.addView(meta);
-        if(large){TextView badge=label(a.id.startsWith("kitsu-")?"CATÁLOGO":a.title.toLowerCase(Locale.ROOT).contains("dublado")?"DUBLADO":"LEGENDADO",8,WHITE,true);pad(badge,7,4,7,4);badge.setBackground(bg(a.title.toLowerCase(Locale.ROOT).contains("dublado")?0xFFEB1530:0xCC262B35,4));FrameLayout.LayoutParams bp=new FrameLayout.LayoutParams(-2,-2,Gravity.TOP|Gravity.LEFT);bp.leftMargin=dp(7);bp.topMargin=dp(7);tile.addView(badge,bp);
-            if(a.episodes>0){TextView count=label(a.episodes+" episódios",8,WHITE,false);pad(count,6,4,6,4);count.setBackground(bg(0xCC15151A,4));FrameLayout.LayoutParams cp=new FrameLayout.LayoutParams(-2,-2,Gravity.TOP|Gravity.RIGHT);cp.rightMargin=dp(7);cp.topMargin=dp(7);tile.addView(count,cp);}}
-        View focusFrame=new View(this);focusFrame.setBackground(outline(Color.TRANSPARENT,RED,8,3));focusFrame.setVisibility(View.GONE);tile.addView(focusFrame,new FrameLayout.LayoutParams(-1,-1));
-        tile.setOnFocusChangeListener((v,focused)->{focusFrame.setVisibility(focused?View.VISIBLE:View.GONE);tile.setScaleX(focused?1.025f:1f);tile.setScaleY(focused?1.025f:1f);});tile.setOnClickListener(v->details(a));return tile;
+    private View card(Anime a,boolean large){
+        int width=large?146:132,height=large?218:198;
+        FrameLayout tile=new FrameLayout(this);tile.setFocusable(true);tile.setBackground(bg(0xFF121216,9));tile.setClipToOutline(false);
+        LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(dp(width),dp(height));lp.rightMargin=dp(14);tile.setLayoutParams(lp);
+        ImageView image=new ImageView(this);image.setScaleType(ImageView.ScaleType.CENTER_CROP);image.setBackground(bg(0xFF18181D,8));tile.addView(image,new FrameLayout.LayoutParams(-1,-1));Net.image(a.poster,image);
+        View shade=new View(this);shade.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,new int[]{0x00000000,0x25000000,0xF0000000}));tile.addView(shade,new FrameLayout.LayoutParams(-1,dp(70),Gravity.BOTTOM));
+        TextView title=label(a.title,12,WHITE,true);title.setTypeface(Typeface.SERIF,Typeface.BOLD);title.setMaxLines(2);title.setEllipsize(android.text.TextUtils.TruncateAt.END);pad(title,9,0,8,8);tile.addView(title,new FrameLayout.LayoutParams(-1,-2,Gravity.BOTTOM));
+        View focus=new View(this);focus.setBackground(outline(Color.TRANSPARENT,RED,9,2));focus.setVisibility(View.GONE);tile.addView(focus,new FrameLayout.LayoutParams(-1,-1));
+        tile.setOnFocusChangeListener((v,foc)->{focus.setVisibility(foc?View.VISIBLE:View.GONE);v.setScaleX(foc?1.035f:1f);v.setScaleY(foc?1.035f:1f);v.setElevation(foc?dp(7):0);});
+        tile.setOnClickListener(v->details(a));return tile;
     }
-    private TextView button(String title,Runnable action){TextView b=label(title,16,WHITE,true);b.setGravity(Gravity.CENTER);pad(b,18,12,18,12);b.setBackground(bg(0xFF292930,10));b.setFocusable(true);
-        b.setOnFocusChangeListener((v,f)->b.setBackground(bg(f?0xFF8C2333:0xFF292930,10)));b.setOnClickListener(v->action.run());return b;}
-    private void showSearch(){shell("Pesquisa");content.addView(label("Pesquisa",30,WHITE,true));
-        EditText query=new EditText(this);query.setSingleLine(true);query.setHint("Buscar anime...");query.setTextColor(WHITE);query.setHintTextColor(MUTED);query.setTextSize(19*uiScale());query.setBackground(bg(0xFF242428,12));pad(query,18,10,18,10);
-        LinearLayout.LayoutParams qp=new LinearLayout.LayoutParams(-1,dp(58));qp.topMargin=dp(26);content.addView(query,qp);
-        heading("Categorias");HorizontalScrollView sc=new HorizontalScrollView(this);sc.setHorizontalScrollBarEnabled(false);LinearLayout chips=new LinearLayout(this);sc.addView(chips);content.addView(sc);
-        heading("Catálogo de animes");LinearLayout results=column();content.addView(results);
-        heading("Catálogo mundial · informações dos animes");LinearLayout kitsu=row();
-        String[][] options={{"Todos",""},{"Ação","Ação"},{"Aventura","Aventura"},{"Fantasia","Fantasia"},{"Romance","Romance"},{"Comédia","Comédia"},{"Suspense","Suspense"},{"Drama","Drama"},{"Esporte","Esporte"},{"Terror","Terror"},{"Mistério","Mistério"},{"Sci-Fi","Sci-Fi"},{"Slice of Life","Slice of Life"},{"Sobrenatural","Sobrenatural"}};
+    private TextView button(String title,Runnable action){
+        TextView b=label(title,14,WHITE,true);b.setGravity(Gravity.CENTER);pad(b,16,8,16,8);b.setFocusable(true);b.setClickable(true);
+        b.setBackground(bg(0xD91A1A20,8));
+        b.setOnFocusChangeListener((v,foc)->{b.setBackground(foc?outline(0xE62B0710,RED,8,2):bg(0xD91A1A20,8));b.setScaleX(foc?1.03f:1f);b.setScaleY(foc?1.03f:1f);});
+        b.setOnClickListener(v->action.run());return b;
+    }
+    private void showSearch(){
+        shell("Pesquisa");
+        TextView eyebrow=label("PESQUISAR",12,RED,true);eyebrow.setLetterSpacing(.18f);content.addView(eyebrow);
+        TextView title=label("Pesquisar",40,WHITE,true);title.setTypeface(Typeface.SERIF,Typeface.BOLD);content.addView(title);
+        TextView subtitle=label("Encontre seus animes favoritos, descubra novos títulos e explore um universo de histórias incríveis.",15,MUTED,false);content.addView(subtitle);
+
+        EditText query=new EditText(this);query.setSingleLine(true);query.setHint("Digite o nome do anime, personagem ou gênero…");query.setTextColor(WHITE);query.setHintTextColor(0xFF9B9BA5);query.setTextSize(17*uiScale());query.setBackground(outline(0xE816161C,0xFF5A5A66,10,1));pad(query,18,8,18,8);
+        query.setOnFocusChangeListener((v,foc)->query.setBackground(outline(foc?0xE62A0710:0xE816161C,foc?RED:0xFF5A5A66,10,foc?2:1)));
+        LinearLayout.LayoutParams qp=new LinearLayout.LayoutParams(-1,dp(54));qp.topMargin=dp(12);qp.bottomMargin=dp(8);content.addView(query,qp);
+
+        sectionTitle("Buscas populares");
+        HorizontalScrollView chipScroll=new HorizontalScrollView(this);chipScroll.setHorizontalScrollBarEnabled(false);LinearLayout chips=new LinearLayout(this);chipScroll.addView(chips);content.addView(chipScroll);
+        String[][] options={{"Todos",""},{"Ação","Ação"},{"Fantasia","Fantasia"},{"Isekai","Isekai"},{"Romance","Romance"},{"Escolar","Escolar"},{"Sobrenatural","Sobrenatural"},{"Mecha","Mecha"},{"Aventura","Aventura"}};
         final String[] genre={""};
-        Runnable search=()->{String q=query.getText().toString().trim();int generation=++searchGeneration;
-            results.removeAllViews();results.addView(label("Carregando catálogo...",16,MUTED,false));appendResults(results,q,genre[0],0,generation);
-            kitsu.removeAllViews();appendKitsu(kitsu,q,0,generation);};
-        for(String[] item:options){TextView chip=button(item[0],()->{genre[0]=item[1];search.run();});LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-2,dp(47));p.rightMargin=dp(10);chips.addView(chip,p);}
-        TextView go=button("⌕  Buscar",search);LinearLayout.LayoutParams gp=new LinearLayout.LayoutParams(dp(170),dp(48));gp.topMargin=dp(12);content.addView(go,2,gp);
+
+        sectionTitle("Resultados");
+        androidx.recyclerview.widget.RecyclerView primary=rail();
+        sectionTitle("Mais resultados");
+        androidx.recyclerview.widget.RecyclerView secondary=rail();
+        AnimeRowAdapter.OnAnimeSelectedListener listener=new AnimeRowAdapter.OnAnimeSelectedListener(){@Override public void onSelected(Anime a){details(a);}@Override public void onAnimeFocused(Anime a){}};
+        AnimeRowAdapter pAdapter=attachRail(primary,listener),sAdapter=attachRail(secondary,listener);
+
+        Runnable search=()->{
+            String q=query.getText().toString().trim();int generation=++searchGeneration;
+            Catalog.page(q,genre[0],0,18,(items,error)->{if(!page.equals("Pesquisa")||generation!=searchGeneration)return;pAdapter.submit(items);for(Anime a:items)seen.put(a.id,a);});
+            Catalog.kitsuPage(q,0,(items,error)->{if(!page.equals("Pesquisa")||generation!=searchGeneration)return;sAdapter.submit(items);for(Anime a:items)seen.put(a.id,a);});
+        };
+        for(String[] item:options){TextView chip=button("⌕  "+item[0],()->{genre[0]=item[1];search.run();});LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(-2,dp(42));cp.rightMargin=dp(8);chips.addView(chip,cp);}
         query.setOnEditorActionListener((v,id,event)->{search.run();((InputMethodManager)getSystemService(INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(query.getWindowToken(),0);return true;});
-        search.run();
+        search.run();query.requestFocus();
     }
     private void appendKitsu(LinearLayout host,String query,int offset,int generation){
         TextView loading=label("Carregando mais títulos...",15,MUTED,false);host.addView(loading);
@@ -275,23 +351,37 @@ public final class MainActivity extends androidx.appcompat.app.AppCompatActivity
         i.putExtra("url",url);i.putExtra("title",a.title);i.putExtra("animeId",historyId(a));i.putExtra("poster",a.poster);i.putExtra("episode",episode);
         i.putExtra("nextUrl",nextUrl);i.putExtra("nextLabel",nextLabel);i.putExtra("startPosition",position);playerOpened=true;startActivity(i);}
     private void play(String url,String title){play(new Anime("sample",title,"","","",0),"Vídeo de teste",url,"","",0);}
-    private void showSettings(){shell("Configurações");content.addView(label("Configurações",30,WHITE,true));
-        String name=getSharedPreferences("auth",0).getString("name","");heading("Conta Google");
-        content.addView(label(name.isEmpty()?"Nenhuma conta vinculada":"Vinculado: "+name,17,MUTED,false));
-        TextView link=button("Vincular conta por código",()->GoogleLink.show(this,()->showSettings()));LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(dp(290),-2);p.topMargin=dp(13);content.addView(link,p);
-        TextView unlink=button("Desvincular",()->{getSharedPreferences("auth",0).edit().remove("sub").remove("name").apply();showSettings();});content.addView(unlink,new LinearLayout.LayoutParams(dp(190),-2));
-        heading("Fontes de episódios para teste");content.addView(label("Insira a URL HTTPS da sua instância das APIs. O catálogo principal usa animestvs.org, e o Kitsu complementa os metadados.",16,MUTED,false));
-        android.content.SharedPreferences pref=getSharedPreferences("sources",0);
-        EditText h=sourceField("URL da api-animesonline-cc",pref.getString("hallan",""));
-        EditText s=sourceField("URL da SugoiAPI",pref.getString("sugoi",""));
-        content.addView(button("Salvar fontes",()->{pref.edit().putString("hallan",h.getText().toString().trim()).putString("sugoi",s.getText().toString().trim()).apply();Toast.makeText(this,"Fontes salvas",Toast.LENGTH_SHORT).show();}));
-        heading("Verificar player");content.addView(button("▶ Reproduzir vídeo de teste",()->play("https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4","Teste do player · Big Buck Bunny")));
-        EditText manual=sourceField("URL HTTPS autorizada (.mp4 ou .m3u8)","");
-        content.addView(button("▶ Reproduzir minha URL",()->{
-            String url=manual.getText().toString().trim();
-            if(!url.startsWith("https://")){Toast.makeText(this,"Use uma URL HTTPS",Toast.LENGTH_SHORT).show();return;}
-            play(url,"Teste de URL própria");
-        }));
+    private void showSettings(){
+        shell("Configurações");
+        TextView eyebrow=label("CONFIGURAÇÕES",12,RED,true);eyebrow.setLetterSpacing(.18f);content.addView(eyebrow);
+        TextView title=label("Personalize sua experiência",34,WHITE,true);title.setTypeface(Typeface.SERIF,Typeface.BOLD);content.addView(title);
+        TextView sub=label("Ajuste reprodução, qualidade, idioma e outros recursos do Koda Anime.",15,MUTED,false);LinearLayout.LayoutParams slp=new LinearLayout.LayoutParams(-1,-2);slp.bottomMargin=dp(14);content.addView(sub,slp);
+
+        android.content.SharedPreferences prefs=getSharedPreferences("ui_settings",0);
+        settingsToggle("▶","Reprodução automática","Reproduzir o próximo episódio automaticamente.","autoplay",true,prefs);
+        settingsToggle("▷","Iniciar próximo episódio","Retomar automaticamente de onde parou.","resume",true,prefs);
+        settingsToggle("◉","Prévia automática","Reproduzir trailers ao navegar pelos títulos.","preview",false,prefs);
+        settingsChoice("▣","Qualidade","Qualidade de vídeo padrão","Automática (Recomendada)");
+        settingsChoice("◎","Idioma","Idioma da interface","Português (Brasil)");
+        settingsChoice("◖","Áudio","Idioma de áudio padrão","Japonês (Original)");
+        settingsChoice("▤","Legendas","Idioma das legendas padrão","Português (Brasil)");
+        settingsAction("◷","Histórico","Gerencie seu histórico de reprodução.","Limpar",()->{getSharedPreferences("watch_history",0).edit().clear().apply();Toast.makeText(this,"Histórico limpo.",Toast.LENGTH_SHORT).show();});
+        settingsAction("ⓘ","Sobre o aplicativo","Koda Anime TV · versão "+BuildConfig.VERSION_NAME,"Detalhes",()->new AlertDialog.Builder(this).setTitle("Koda Anime TV").setMessage("Versão "+BuildConfig.VERSION_NAME+"\nInterface para Android TV.").setPositiveButton("OK",null).show());
+    }
+    private void settingsToggle(String icon,String title,String desc,String key,boolean def,android.content.SharedPreferences prefs){
+        LinearLayout card=settingsCard(icon,title,desc);Switch toggle=new Switch(this);toggle.setChecked(prefs.getBoolean(key,def));toggle.setOnCheckedChangeListener((b,on)->prefs.edit().putBoolean(key,on).apply());card.addView(toggle,new LinearLayout.LayoutParams(-2,-2));
+    }
+    private void settingsChoice(String icon,String title,String desc,String value){
+        LinearLayout card=settingsCard(icon,title,desc);TextView choice=button(value+"  ›",()->{});card.addView(choice,new LinearLayout.LayoutParams(dp(225),dp(42)));
+    }
+    private void settingsAction(String icon,String title,String desc,String action,Runnable run){
+        LinearLayout card=settingsCard(icon,title,desc);TextView b=button(action,run);card.addView(b,new LinearLayout.LayoutParams(dp(130),dp(42)));
+    }
+    private LinearLayout settingsCard(String icon,String title,String desc){
+        LinearLayout card=new LinearLayout(this);card.setGravity(Gravity.CENTER_VERTICAL);pad(card,14,10,14,10);card.setBackground(outline(0xE6111116,0xFF34343C,10,1));
+        TextView glyph=label(icon,22,RED,true);glyph.setGravity(Gravity.CENTER);card.addView(glyph,new LinearLayout.LayoutParams(dp(52),dp(48)));
+        LinearLayout text=column();TextView h=label(title,18,WHITE,true);TextView d=label(desc,13,MUTED,false);text.addView(h);text.addView(d);card.addView(text,new LinearLayout.LayoutParams(0,-2,1));
+        LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,dp(68));lp.bottomMargin=dp(8);content.addView(card,lp);return card;
     }
     private EditText sourceField(String hint,String value){EditText field=new EditText(this);field.setSingleLine(true);field.setHint(hint);field.setText(value);field.setTextColor(WHITE);field.setHintTextColor(MUTED);field.setTextSize(16*uiScale());field.setBackground(bg(0xFF26262C,9));pad(field,14,8,14,8);
         LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,dp(48));p.topMargin=dp(14);content.addView(field,p);return field;}
