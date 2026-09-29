@@ -297,7 +297,7 @@ public final class MainActivity extends androidx.appcompat.app.AppCompatActivity
     private void showDetail(Anime a){selectedAnime=a;shell("Detalhes");
         TextView back=button("‹  Voltar",this::backFromDetail);content.addView(back,new LinearLayout.LayoutParams(dp(140),dp(44)));if(detailFocus.isEmpty())back.requestFocus();
         LinearLayout hero=new LinearLayout(this);LinearLayout.LayoutParams hp=new LinearLayout.LayoutParams(-1,-2);hp.topMargin=dp(16);hp.bottomMargin=dp(20);content.addView(hero,hp);
-        ImageView cover=new ImageView(this);cover.setScaleType(ImageView.ScaleType.CENTER_CROP);cover.setBackground(bg(0xFF29212A,12));cover.setClipToOutline(true);
+        ImageView cover=new ImageView(this);cover.setScaleType(ImageView.ScaleType.CENTER_CROP);cover.setBackground(bg(0xFF151519,12));cover.setClipToOutline(true);
         hero.addView(cover,new LinearLayout.LayoutParams(dp(178),dp(248)));Net.image(a.poster,cover);
         LinearLayout info=column();pad(info,26,0,0,0);hero.addView(info,new LinearLayout.LayoutParams(0,-2,1));
         TextView badge=label("SÉRIE EM DESTAQUE",11,RED,true);badge.setLetterSpacing(.18f);info.addView(badge);
@@ -311,7 +311,7 @@ public final class MainActivity extends androidx.appcompat.app.AppCompatActivity
         addDetailAction(heroActions,button(isFavorite(a)?"♥  Favorito":"♡  Favoritar",()->{toggleFavorite(a);showDetail(a);}));
         WatchHistory.Entry previous=null;for(WatchHistory.Entry e:WatchHistory.all(this))if(e.animeId.equals(historyId(a))){previous=e;break;}
         if(previous!=null){WatchHistory.Entry h=previous;addDetailAction(heroActions,button("▶  Continuar "+h.episode,()->play(a,h.episode,h.url,"","",h.position)));}
-        LinearLayout panel=column();pad(panel,20,18,20,20);panel.setBackground(bg(0xFF17171C,13));content.addView(panel,new LinearLayout.LayoutParams(-1,-2));
+        LinearLayout panel=column();pad(panel,20,18,20,20);panel.setBackground(bg(0xFF111116,13));content.addView(panel,new LinearLayout.LayoutParams(-1,-2));
         panel.addView(label("Episódios",24,WHITE,true));
         TextView versionsTitle=label("TEMPORADAS",13,MUTED,true);LinearLayout.LayoutParams vtp=new LinearLayout.LayoutParams(-1,-2);vtp.topMargin=dp(18);vtp.bottomMargin=dp(8);panel.addView(versionsTitle,vtp);
         HorizontalScrollView versionScroll=new HorizontalScrollView(this);versionScroll.setHorizontalScrollBarEnabled(false);panel.addView(versionScroll);
