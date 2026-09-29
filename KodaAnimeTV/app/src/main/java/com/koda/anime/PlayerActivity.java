@@ -2,8 +2,8 @@ package com.koda.anime;
 
 import android.app.*;
 import android.content.*;
-import android.graphics.Color;
-import android.graphics.drawable.GradientDrawable;
+import android.graphics.*;
+import android.graphics.drawable.*;
 import android.os.*;
 import android.view.*;
 import android.widget.*;
@@ -13,14 +13,14 @@ import androidx.media3.ui.PlayerView;
 import java.util.*;
 
 public final class PlayerActivity extends Activity {
-    private static final int WHITE=0xFFFFFFFF, MUTED=0xFFB8B8C0, RED=0xFFFF1635;
+    private static final int WHITE=0xFFFFFFFF,MUTED=0xFFB8B8C0,RED=0xFFFF1635;
     private final Handler handler=new Handler(Looper.getMainLooper());
     private ExoPlayer player; private PlayerView video;
-    private FrameLayout safeControls; private LinearLayout center,bottom;
-    private TextView heading,quality,next,time,skip;
-    private ImageButton playPause,rewind,forward;
-    private ImageView topArt,bottomArt,leaves;
-    private SeekBar progress; private View tap; private boolean tracking;
+    private FrameLayout controlsLayer; private LinearLayout centerRow,topActions,bottomActions;
+    private ImageButton playPause,rewind,forward,next,skip,quality,audio,subtitles;
+    private TextView heading,time;
+    private SeekBar progress; private View tap;
+    private boolean tracking;
     private long startPosition,openingEndMs=-1;
     private String url,title,animeId,poster,episode,nextUrl,nextLabel;
     private ScreenFit screenFit;
@@ -29,21 +29,24 @@ public final class PlayerActivity extends Activity {
     private GradientDrawable bg(int color,int radius){GradientDrawable g=new GradientDrawable();g.setColor(color);g.setCornerRadius(dp(radius));return g;}
     private GradientDrawable outline(int fill,int stroke,int radius,int width){GradientDrawable g=bg(fill,radius);g.setStroke(dp(width),stroke);return g;}
 
-    private TextView textControl(String text,int size,Runnable action){
-        TextView v=new TextView(this);v.setText(text);v.setTextColor(WHITE);v.setTextSize(size*screenFit.textScale(this));v.setGravity(Gravity.CENTER);
-        v.setPadding(dp(14),dp(6),dp(14),dp(6));v.setBackground(bg(0xB814141A,12));v.setFocusable(true);v.setClickable(true);
-        v.setOnFocusChangeListener((view,focus)->{v.setBackground(focus?outline(0xE0280710,RED,12,2):bg(0xB814141A,12));v.setScaleX(focus?1.035f:1f);v.setScaleY(focus?1.035f:1f);if(focus)showControls();});
-        v.setOnClickListener(view->{action.run();showControls();});return v;
+    private ImageButton atlasButton(Drawable normal,Drawable focused,Runnable action,boolean pill){
+        ImageButton b=new ImageButton(this);
+        b.setImageDrawable(normal);b.setScaleType(ImageView.ScaleType.FIT_CENTER);b.setAdjustViewBounds(true);
+        b.setPadding(0,0,0,0);b.setBackgroundColor(Color.TRANSPARENT);b.setFocusable(true);b.setClickable(true);
+        b.setOnFocusChangeListener((v,f)->{
+            if(focused!=null)b.setImageDrawable(f?focused:normal);
+            if(f&&focused==null)b.setBackground(outline(0x442D0611,RED,pill?18:42,2)); else b.setBackgroundColor(Color.TRANSPARENT);
+            b.setScaleX(f?1.07f:1f);b.setScaleY(f?1.07f:1f);b.setElevation(f?dp(10):0);if(f)showControls();
+        });
+        b.setOnClickListener(v->{action.run();showControls();});
+        return b;
     }
-
-    private ImageButton imageControl(int drawable,Runnable action){
-        ImageButton b=new ImageButton(this);b.setImageResource(drawable);b.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
-        b.setPadding(dp(7),dp(7),dp(7),dp(7));b.setBackground(bg(0x6608080A,44));b.setFocusable(true);b.setClickable(true);
-        b.setOnFocusChangeListener((view,focus)->{b.setBackground(focus?outline(0xAA220610,RED,44,2):bg(0x6608080A,44));b.setScaleX(focus?1.08f:1f);b.setScaleY(focus?1.08f:1f);b.setElevation(focus?dp(10):0);if(focus)showControls();});
-        b.setOnClickListener(view->{action.run();showControls();});return b;
+    private void addCircle(LinearLayout row,View v,int size){
+        LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(dp(size),dp(size));p.leftMargin=dp(10);p.rightMargin=dp(10);row.addView(v,p);
     }
-
-    private void addImage(LinearLayout row,View v,int size){LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(dp(size),dp(size));p.leftMargin=dp(8);p.rightMargin=dp(8);row.addView(v,p);}
+    private void addPill(LinearLayout row,View v,int width){
+        LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(dp(width),dp(48));p.leftMargin=dp(6);p.rightMargin=dp(6);row.addView(v,p);
+    }
 
     @Override public void onCreate(Bundle state){
         super.onCreate(state);
@@ -55,69 +58,93 @@ public final class PlayerActivity extends Activity {
         ScreenFit.immersive(this);screenFit=new ScreenFit(this);
         FrameLayout root=new FrameLayout(this);root.setBackgroundColor(Color.BLACK);setContentView(root);
 
-        video=new PlayerView(this);video.setUseController(false);video.setKeepScreenOn(true);root.addView(video,new FrameLayout.LayoutParams(-1,-1));
-        tap=new View(this);tap.setFocusable(true);tap.setClickable(true);tap.setOnClickListener(v->showControls());root.addView(tap,new FrameLayout.LayoutParams(-1,-1));
+        video=new PlayerView(this);video.setUseController(false);video.setKeepScreenOn(true);
+        video.setResizeMode(androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT);
+        root.addView(video,new FrameLayout.LayoutParams(-1,-1));
 
-        safeControls=new FrameLayout(this);root.addView(safeControls,screenFit.centered());
+        tap=new View(this);tap.setFocusable(true);tap.setClickable(true);tap.setOnClickListener(v->{showControls();playPause.requestFocus();});
+        root.addView(tap,new FrameLayout.LayoutParams(-1,-1));
 
-        topArt=new ImageView(this);topArt.setImageResource(R.drawable.koda_overlay_top);topArt.setScaleType(ImageView.ScaleType.FIT_XY);topArt.setAlpha(.84f);
-        FrameLayout.LayoutParams ta=new FrameLayout.LayoutParams(dp(420),dp(86),Gravity.TOP|Gravity.RIGHT);ta.rightMargin=dp(4);safeControls.addView(topArt,ta);
+        controlsLayer=new FrameLayout(this);root.addView(controlsLayer,screenFit.centered());
 
-        bottomArt=new ImageView(this);bottomArt.setImageResource(R.drawable.koda_overlay_bottom);bottomArt.setScaleType(ImageView.ScaleType.FIT_XY);bottomArt.setAlpha(.78f);
-        FrameLayout.LayoutParams ba=new FrameLayout.LayoutParams(dp(430),dp(88),Gravity.BOTTOM|Gravity.LEFT);ba.leftMargin=dp(4);safeControls.addView(bottomArt,ba);
+        View topShade=new View(this);
+        topShade.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,new int[]{0xCC000000,0x60000000,0x00000000}));
+        FrameLayout.LayoutParams ts=new FrameLayout.LayoutParams(-1,dp(150),Gravity.TOP);controlsLayer.addView(topShade,ts);
 
-        leaves=new ImageView(this);leaves.setImageResource(R.drawable.koda_leaves);leaves.setScaleType(ImageView.ScaleType.FIT_CENTER);leaves.setAlpha(.58f);
-        FrameLayout.LayoutParams la=new FrameLayout.LayoutParams(dp(105),dp(190),Gravity.TOP|Gravity.RIGHT);la.rightMargin=dp(6);la.topMargin=dp(32);safeControls.addView(leaves,la);
+        View bottomShade=new View(this);
+        bottomShade.setBackground(new GradientDrawable(GradientDrawable.Orientation.BOTTOM_TOP,new int[]{0xE6000000,0x8A000000,0x00000000}));
+        FrameLayout.LayoutParams bs=new FrameLayout.LayoutParams(-1,dp(175),Gravity.BOTTOM);controlsLayer.addView(bottomShade,bs);
 
-        ImageView logo=new ImageView(this);logo.setImageResource(R.mipmap.ic_launcher);logo.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
-        FrameLayout.LayoutParams logoLp=new FrameLayout.LayoutParams(dp(104),dp(66),Gravity.TOP|Gravity.LEFT);logoLp.leftMargin=dp(24);logoLp.topMargin=dp(14);safeControls.addView(logo,logoLp);
+        ImageView leaves=new ImageView(this);leaves.setImageResource(R.drawable.koda_leaves);leaves.setScaleType(ImageView.ScaleType.CENTER_INSIDE);leaves.setAlpha(.23f);
+        FrameLayout.LayoutParams llp=new FrameLayout.LayoutParams(dp(54),dp(110),Gravity.TOP|Gravity.RIGHT);llp.rightMargin=dp(8);llp.topMargin=dp(8);controlsLayer.addView(leaves,llp);
 
         heading=new TextView(this);heading.setText((episode==null?"":episode)+"\n"+(title==null?"Koda Anime":title));heading.setTextColor(WHITE);
-        heading.setTextSize(16*screenFit.textScale(this));heading.setPadding(dp(20),dp(12),dp(20),dp(12));heading.setBackground(bg(0xA808080A,10));
-        FrameLayout.LayoutParams headLp=new FrameLayout.LayoutParams(dp(500),-2,Gravity.TOP|Gravity.LEFT);headLp.leftMargin=dp(24);headLp.topMargin=dp(82);safeControls.addView(heading,headLp);
+        heading.setTextSize(17*screenFit.textScale(this));heading.setTypeface(null,Typeface.BOLD);heading.setShadowLayer(8,0,2,0xFF000000);heading.setMaxLines(2);
+        FrameLayout.LayoutParams hp=new FrameLayout.LayoutParams(dp(520),-2,Gravity.TOP|Gravity.LEFT);hp.leftMargin=dp(28);hp.topMargin=dp(24);controlsLayer.addView(heading,hp);
 
-        center=new LinearLayout(this);center.setGravity(Gravity.CENTER);
-        FrameLayout.LayoutParams cp=new FrameLayout.LayoutParams(-1,-2,Gravity.CENTER);safeControls.addView(center,cp);
-        rewind=imageControl(R.drawable.koda_player_rewind,()->seekBy(-10000));addImage(center,rewind,76);
-        playPause=imageControl(R.drawable.koda_player_pause,()->{if(player==null)return;if(player.isPlaying())player.pause();else player.play();update();});addImage(center,playPause,88);
-        forward=imageControl(R.drawable.koda_player_rewind,()->seekBy(10000));forward.setScaleX(-1f);addImage(center,forward,76);
+        Bitmap pa=KodaAtlas.player(this);
+        quality=atlasButton(KodaAtlas.crop(this,pa,189,65,71,22),KodaAtlas.crop(this,pa,274,60,81,27),this::showQuality,true);
+        audio=atlasButton(KodaAtlas.crop(this,pa,196,95,54,20),null,()->showTrackPicker(C.TRACK_TYPE_AUDIO,"Áudio"),true);
+        subtitles=atlasButton(KodaAtlas.crop(this,pa,269,95,63,20),null,this::showSubtitlePicker,true);
+        topActions=new LinearLayout(this);topActions.setGravity(Gravity.RIGHT|Gravity.CENTER_VERTICAL);
+        addPill(topActions,audio,120);addPill(topActions,subtitles,140);addPill(topActions,quality,150);
+        FrameLayout.LayoutParams topLp=new FrameLayout.LayoutParams(-2,dp(52),Gravity.TOP|Gravity.RIGHT);topLp.rightMargin=dp(26);topLp.topMargin=dp(24);controlsLayer.addView(topActions,topLp);
 
-        bottom=new LinearLayout(this);bottom.setOrientation(LinearLayout.VERTICAL);bottom.setPadding(dp(24),dp(11),dp(24),dp(14));bottom.setBackground(bg(0xC608080A,12));
-        FrameLayout.LayoutParams bp=new FrameLayout.LayoutParams(-1,dp(118),Gravity.BOTTOM);bp.leftMargin=dp(18);bp.rightMargin=dp(18);bp.bottomMargin=dp(16);safeControls.addView(bottom,bp);
+        rewind=atlasButton(KodaAtlas.crop(this,pa,5,42,29,32),KodaAtlas.crop(this,pa,51,39,28,36),()->seekBy(-10000),false);
+        playPause=atlasButton(KodaAtlas.crop(this,pa,94,4,32,31),KodaAtlas.crop(this,pa,142,3,26,33),()->{if(player==null)return;if(player.isPlaying())player.pause();else player.play();update();},false);
+        forward=atlasButton(KodaAtlas.crop(this,pa,94,42,32,33),KodaAtlas.crop(this,pa,142,39,26,36),()->seekBy(10000),false);
+        centerRow=new LinearLayout(this);centerRow.setGravity(Gravity.CENTER);
+        addCircle(centerRow,rewind,74);addCircle(centerRow,playPause,86);addCircle(centerRow,forward,74);
+        FrameLayout.LayoutParams cp=new FrameLayout.LayoutParams(-1,-2,Gravity.CENTER);controlsLayer.addView(centerRow,cp);
 
-        LinearLayout seekRow=new LinearLayout(this);seekRow.setGravity(Gravity.CENTER_VERTICAL);bottom.addView(seekRow,new LinearLayout.LayoutParams(-1,dp(36)));
-        time=new TextView(this);time.setTextColor(WHITE);time.setTextSize(13*screenFit.textScale(this));time.setText("00:00 / 00:00");
-        LinearLayout.LayoutParams timeLp=new LinearLayout.LayoutParams(dp(110),-2);seekRow.addView(time,timeLp);
-        progress=new SeekBar(this);progress.setMax(1000);progress.setProgressTintList(android.content.res.ColorStateList.valueOf(RED));progress.setProgressBackgroundTintList(android.content.res.ColorStateList.valueOf(0xFF55555E));progress.setThumbTintList(android.content.res.ColorStateList.valueOf(RED));
-        seekRow.addView(progress,new LinearLayout.LayoutParams(0,dp(34),1));
+        skip=atlasButton(KodaAtlas.crop(this,pa,191,35,69,21),KodaAtlas.crop(this,pa,265,30,89,27),()->{
+            if(player!=null&&openingEndMs>0&&openingEndMs>player.getCurrentPosition())seekTo(openingEndMs);
+        },true);
+        FrameLayout.LayoutParams skp=new FrameLayout.LayoutParams(dp(176),dp(48),Gravity.BOTTOM|Gravity.RIGHT);skp.rightMargin=dp(28);skp.bottomMargin=dp(105);controlsLayer.addView(skip,skp);skip.setVisibility(View.GONE);
+
+        LinearLayout seekWrap=new LinearLayout(this);seekWrap.setGravity(Gravity.CENTER_VERTICAL);
+        time=new TextView(this);time.setTextColor(WHITE);time.setTextSize(12*screenFit.textScale(this));time.setText("00:00 / 00:00");
+        seekWrap.addView(time,new LinearLayout.LayoutParams(dp(100),-2));
+        progress=new SeekBar(this);progress.setMax(1000);progress.setProgressTintList(android.content.res.ColorStateList.valueOf(RED));
+        progress.setProgressBackgroundTintList(android.content.res.ColorStateList.valueOf(0xFF4B4B52));progress.setThumbTintList(android.content.res.ColorStateList.valueOf(WHITE));
+        seekWrap.addView(progress,new LinearLayout.LayoutParams(0,dp(34),1));
+        FrameLayout.LayoutParams seekLp=new FrameLayout.LayoutParams(-1,dp(40),Gravity.BOTTOM);seekLp.leftMargin=dp(28);seekLp.rightMargin=dp(28);seekLp.bottomMargin=dp(58);controlsLayer.addView(seekWrap,seekLp);
+
         progress.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){
             @Override public void onStartTrackingTouch(SeekBar s){tracking=true;handler.removeCallbacks(hide);}
             @Override public void onStopTrackingTouch(SeekBar s){tracking=false;if(player!=null)seekTo(s.getProgress()*Math.max(0,player.getDuration())/1000);showControls();}
             @Override public void onProgressChanged(SeekBar s,int p,boolean user){if(user&&player!=null)time.setText(format(p*Math.max(0,player.getDuration())/1000)+" / "+format(player.getDuration()));}
         });
 
-        LinearLayout actions=new LinearLayout(this);actions.setGravity(Gravity.CENTER_VERTICAL);bottom.addView(actions,new LinearLayout.LayoutParams(-1,dp(58)));
-        quality=textControl("⚙  Qualidade: Auto",14,this::showQuality);LinearLayout.LayoutParams qlp=new LinearLayout.LayoutParams(0,dp(48),1);qlp.rightMargin=dp(10);actions.addView(quality,qlp);
-        next=textControl("Próximo episódio  ⏭",14,this::playNext);LinearLayout.LayoutParams nlp=new LinearLayout.LayoutParams(0,dp(48),1);nlp.rightMargin=dp(10);actions.addView(next,nlp);
+        next=atlasButton(KodaAtlas.crop(this,pa,188,5,72,21),KodaAtlas.crop(this,pa,265,0,90,27),this::playNext,true);
+        bottomActions=new LinearLayout(this);bottomActions.setGravity(Gravity.LEFT|Gravity.CENTER_VERTICAL);addPill(bottomActions,next,170);
+        FrameLayout.LayoutParams blp=new FrameLayout.LayoutParams(-2,dp(50),Gravity.BOTTOM|Gravity.LEFT);blp.leftMargin=dp(28);blp.bottomMargin=dp(12);controlsLayer.addView(bottomActions,blp);
         next.setVisibility(nextUrl!=null&&nextUrl.startsWith("https://")?View.VISIBLE:View.GONE);
-        skip=textControl("Pular abertura  ⏩",14,()->{if(player!=null&&openingEndMs>0&&openingEndMs>player.getCurrentPosition())seekTo(openingEndMs);});
-        actions.addView(skip,new LinearLayout.LayoutParams(0,dp(48),1));skip.setVisibility(View.GONE);
 
-        showControls();handler.post(updateLoop);
+        showControls();playPause.requestFocus();handler.post(updateLoop);
     }
 
     private String format(long ms){long s=Math.max(0,ms)/1000;return String.format(Locale.ROOT,"%02d:%02d",s/60,s%60);}
-    private final Runnable hide=()->{if(tracking)return;heading.setVisibility(View.GONE);center.setVisibility(View.GONE);bottom.setVisibility(View.GONE);topArt.setVisibility(View.GONE);bottomArt.setVisibility(View.GONE);leaves.setVisibility(View.GONE);tap.requestFocus();};
+    private final Runnable hide=()->hideControls();
     private final Runnable updateLoop=new Runnable(){@Override public void run(){update();handler.postDelayed(this,600);}};
 
+    private void hideControls(){
+        if(tracking||controlsLayer==null)return;
+        controlsLayer.setVisibility(View.GONE);tap.requestFocus();
+    }
     private void showControls(){
-        heading.setVisibility(View.VISIBLE);center.setVisibility(View.VISIBLE);bottom.setVisibility(View.VISIBLE);topArt.setVisibility(View.VISIBLE);bottomArt.setVisibility(View.VISIBLE);leaves.setVisibility(View.VISIBLE);
-        handler.removeCallbacks(hide);handler.postDelayed(hide,4500);
+        if(controlsLayer==null)return;
+        controlsLayer.setVisibility(View.VISIBLE);
+        handler.removeCallbacks(hide);handler.postDelayed(hide,4200);
     }
 
     private void update(){
         if(player==null)return;long pos=player.getCurrentPosition(),dur=player.getDuration();
-        playPause.setImageResource(player.isPlaying()?R.drawable.koda_player_pause:R.drawable.koda_player_play);
+        Bitmap pa=KodaAtlas.player(this);
+        boolean playing=player.isPlaying();
+        Drawable normal=playing?KodaAtlas.crop(this,pa,94,4,32,31):KodaAtlas.crop(this,pa,5,4,30,31);
+        Drawable focused=playing?KodaAtlas.crop(this,pa,142,3,26,33):KodaAtlas.crop(this,pa,51,2,28,34);
+        playPause.setTag(playing?1:0);playPause.setImageDrawable(playPause.hasFocus()?focused:normal);
         if(skip!=null)skip.setVisibility(openingEndMs>0&&pos>=0&&pos<openingEndMs?View.VISIBLE:View.GONE);
         if(!tracking){time.setText(format(pos)+" / "+format(dur));progress.setProgress(dur>0?(int)Math.min(1000,pos*1000/dur):0);}
     }
@@ -128,6 +155,7 @@ public final class PlayerActivity extends Activity {
         player.addListener(new Player.Listener(){
             @Override public void onPlayerError(PlaybackException e){Toast.makeText(PlayerActivity.this,"Não foi possível reproduzir: "+e.getErrorCodeName(),Toast.LENGTH_LONG).show();}
             @Override public void onPlaybackStateChanged(int state){if(state==Player.STATE_ENDED){save(true);showControls();}update();}
+            @Override public void onIsPlayingChanged(boolean isPlaying){update();}
         });
         player.setMediaItem(MediaItem.fromUri(url));player.prepare();if(startPosition>0)player.seekTo(startPosition);player.play();
     }
@@ -141,25 +169,57 @@ public final class PlayerActivity extends Activity {
     }
 
     private void playNext(){
-        if(nextUrl==null||!nextUrl.startsWith("https://"))return;save(false);url=nextUrl;episode=nextLabel;nextUrl="";next.setVisibility(View.GONE);startPosition=0;openingEndMs=-1;
-        heading.setText(episode+"\n"+title);player.setMediaItem(MediaItem.fromUri(url));player.prepare();player.play();showControls();
+        if(nextUrl==null||!nextUrl.startsWith("https://"))return;save(false);
+        url=nextUrl;episode=nextLabel;nextUrl="";next.setVisibility(View.GONE);startPosition=0;openingEndMs=-1;
+        heading.setText((episode==null?"Episódio":episode)+"\n"+title);player.setMediaItem(MediaItem.fromUri(url));player.prepare();player.play();showControls();
+    }
+
+    private String trackName(Format f,int index){
+        if(f.label!=null&&!f.label.trim().isEmpty())return f.label;
+        if(f.language!=null&&!f.language.trim().isEmpty())return f.language.toUpperCase(Locale.ROOT);
+        if(f.height>0)return f.height+"p";
+        if(f.bitrate>0)return (f.bitrate/1000)+" kbps";
+        return "Faixa "+(index+1);
     }
 
     private void showQuality(){
         if(player==null)return;ArrayList<String> labels=new ArrayList<>();ArrayList<TrackSelectionOverride> choices=new ArrayList<>();labels.add("Automática");choices.add(null);
         Set<String> seen=new HashSet<>();
-        for(Tracks.Group group:player.getCurrentTracks().getGroups()){
-            if(group.getType()!=C.TRACK_TYPE_VIDEO)continue;
-            for(int i=0;i<group.length;i++){
-                if(!group.isTrackSupported(i))continue;Format f=group.getTrackFormat(i);
-                String name=f.height>0?f.height+"p":f.bitrate>0?f.bitrate/1000+" kbps":"Faixa "+(i+1);
+        for(Tracks.Group group:player.getCurrentTracks().getGroups())if(group.getType()==C.TRACK_TYPE_VIDEO){
+            for(int i=0;i<group.length;i++)if(group.isTrackSupported(i)){
+                Format f=group.getTrackFormat(i);String name=f.height>0?f.height+"p":trackName(f,i);
                 if(seen.add(name)){labels.add(name);choices.add(new TrackSelectionOverride(group.getMediaTrackGroup(),i));}
             }
         }
-        if(labels.size()==1){new AlertDialog.Builder(this).setMessage("Este vídeo oferece apenas a qualidade original.").setPositiveButton("OK",null).show();return;}
-        new AlertDialog.Builder(this).setTitle("Resolução").setItems(labels.toArray(new String[0]),(dialog,index)->{
+        if(labels.size()==1){Toast.makeText(this,"Este vídeo oferece apenas a qualidade original.",Toast.LENGTH_SHORT).show();return;}
+        new AlertDialog.Builder(this).setTitle("Qualidade").setItems(labels.toArray(new String[0]),(d,index)->{
             TrackSelectionParameters.Builder p=player.getTrackSelectionParameters().buildUpon();p.clearOverridesOfType(C.TRACK_TYPE_VIDEO);
-            if(index>0)p.setOverrideForType(choices.get(index));player.setTrackSelectionParameters(p.build());quality.setText("⚙  Qualidade: "+labels.get(index));showControls();
+            if(index>0)p.setOverrideForType(choices.get(index));player.setTrackSelectionParameters(p.build());showControls();
+        }).show();
+    }
+
+    private void showTrackPicker(int type,String titleText){
+        if(player==null)return;ArrayList<String> labels=new ArrayList<>();ArrayList<TrackSelectionOverride> choices=new ArrayList<>();
+        for(Tracks.Group group:player.getCurrentTracks().getGroups())if(group.getType()==type){
+            for(int i=0;i<group.length;i++)if(group.isTrackSupported(i)){
+                labels.add(trackName(group.getTrackFormat(i),i));choices.add(new TrackSelectionOverride(group.getMediaTrackGroup(),i));
+            }
+        }
+        if(labels.isEmpty()){Toast.makeText(this,titleText+" indisponível neste vídeo.",Toast.LENGTH_SHORT).show();return;}
+        new AlertDialog.Builder(this).setTitle(titleText).setItems(labels.toArray(new String[0]),(d,index)->{
+            TrackSelectionParameters.Builder p=player.getTrackSelectionParameters().buildUpon();p.clearOverridesOfType(type);p.setTrackTypeDisabled(type,false);p.setOverrideForType(choices.get(index));player.setTrackSelectionParameters(p.build());showControls();
+        }).show();
+    }
+
+    private void showSubtitlePicker(){
+        if(player==null)return;ArrayList<String> labels=new ArrayList<>();ArrayList<TrackSelectionOverride> choices=new ArrayList<>();labels.add("Desativadas");choices.add(null);
+        for(Tracks.Group group:player.getCurrentTracks().getGroups())if(group.getType()==C.TRACK_TYPE_TEXT){
+            for(int i=0;i<group.length;i++)if(group.isTrackSupported(i)){labels.add(trackName(group.getTrackFormat(i),i));choices.add(new TrackSelectionOverride(group.getMediaTrackGroup(),i));}
+        }
+        if(labels.size()==1){Toast.makeText(this,"Legendas indisponíveis neste vídeo.",Toast.LENGTH_SHORT).show();return;}
+        new AlertDialog.Builder(this).setTitle("Legendas").setItems(labels.toArray(new String[0]),(d,index)->{
+            TrackSelectionParameters.Builder p=player.getTrackSelectionParameters().buildUpon();p.clearOverridesOfType(C.TRACK_TYPE_TEXT);
+            p.setTrackTypeDisabled(C.TRACK_TYPE_TEXT,index==0);if(index>0)p.setOverrideForType(choices.get(index));player.setTrackSelectionParameters(p.build());showControls();
         }).show();
     }
 
@@ -167,8 +227,9 @@ public final class PlayerActivity extends Activity {
         if(key==KeyEvent.KEYCODE_MEDIA_REWIND){seekBy(-10000);showControls();return true;}
         if(key==KeyEvent.KEYCODE_MEDIA_FAST_FORWARD){seekBy(10000);showControls();return true;}
         if(key==KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE&&player!=null){if(player.isPlaying())player.pause();else player.play();showControls();return true;}
-        if((key==KeyEvent.KEYCODE_DPAD_CENTER||key==KeyEvent.KEYCODE_DPAD_UP||key==KeyEvent.KEYCODE_DPAD_DOWN||key==KeyEvent.KEYCODE_DPAD_LEFT||key==KeyEvent.KEYCODE_DPAD_RIGHT)&&center.getVisibility()!=View.VISIBLE){showControls();playPause.requestFocus();return true;}
-        if(key==KeyEvent.KEYCODE_DPAD_UP||key==KeyEvent.KEYCODE_DPAD_DOWN||key==KeyEvent.KEYCODE_DPAD_LEFT||key==KeyEvent.KEYCODE_DPAD_RIGHT)showControls();
+        boolean dpad=key==KeyEvent.KEYCODE_DPAD_CENTER||key==KeyEvent.KEYCODE_DPAD_UP||key==KeyEvent.KEYCODE_DPAD_DOWN||key==KeyEvent.KEYCODE_DPAD_LEFT||key==KeyEvent.KEYCODE_DPAD_RIGHT;
+        if(dpad&&controlsLayer.getVisibility()!=View.VISIBLE){showControls();playPause.requestFocus();return true;}
+        if(dpad)showControls();
         return super.onKeyDown(key,event);
     }
 

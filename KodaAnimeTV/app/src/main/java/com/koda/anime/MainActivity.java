@@ -12,7 +12,7 @@ import android.widget.*;
 import java.util.*;
 
 public final class MainActivity extends androidx.appcompat.app.AppCompatActivity {
-    private static final int BLACK=0xFF08080A, SIDE=0xFF0E0E12, RED=0xFFFF1635, RED_DARK=0xFF9E001B, WHITE=0xFFFFFFFF, MUTED=0xFFB8B8C0; private static final String VERSION="0.17-assets";
+    private static final int BLACK=0xFF08080A, SIDE=0xFF0E0E12, RED=0xFFFF1635, RED_DARK=0xFF9E001B, WHITE=0xFFFFFFFF, MUTED=0xFFB8B8C0; private static final String VERSION="0.18-assets-player";
     private LinearLayout content,nav; private String page="Início"; private boolean playerOpened; private Anime selectedAnime; private String returnPage="Início",detailFocus=""; private int searchGeneration; private final Map<String,Anime> seen=new LinkedHashMap<>();
     private Anime heroAnime; private ImageView homeHeroImage; private TextView homeHeroTitle,homeHeroDescription,homeHeroWatch;
     private final ArrayList<TextView> navButtons=new ArrayList<>();
@@ -62,14 +62,12 @@ public final class MainActivity extends androidx.appcompat.app.AppCompatActivity
         frame.addView(sc,new LinearLayout.LayoutParams(0,-1,1));
         content=column(); content.setClipChildren(false); content.setClipToPadding(false); pad(content,18,18,18,22); sc.addView(content);
 
-        ImageView topArt=new ImageView(this);topArt.setImageResource(R.drawable.koda_overlay_top);topArt.setScaleType(ImageView.ScaleType.FIT_XY);topArt.setAlpha(target.equals("Início")?.82f:.44f);
-        FrameLayout.LayoutParams topArtLp=new FrameLayout.LayoutParams(dp(390),dp(76),Gravity.TOP|Gravity.RIGHT);topArtLp.rightMargin=dp(10);topArtLp.topMargin=dp(2);viewport.addView(topArt,topArtLp);
-
-        ImageView bottomArt=new ImageView(this);bottomArt.setImageResource(R.drawable.koda_overlay_bottom);bottomArt.setScaleType(ImageView.ScaleType.FIT_XY);bottomArt.setAlpha(target.equals("Início")?.72f:.36f);
-        FrameLayout.LayoutParams bottomArtLp=new FrameLayout.LayoutParams(dp(340),dp(68),Gravity.BOTTOM|Gravity.LEFT);bottomArtLp.leftMargin=dp(184);bottomArtLp.bottomMargin=dp(2);viewport.addView(bottomArt,bottomArtLp);
-
-        ImageView leaves=new ImageView(this);leaves.setImageResource(R.drawable.koda_leaves);leaves.setScaleType(ImageView.ScaleType.FIT_CENTER);leaves.setAlpha(target.equals("Início")?.62f:.28f);
-        FrameLayout.LayoutParams leavesLp=new FrameLayout.LayoutParams(dp(96),dp(182),Gravity.TOP|Gravity.RIGHT);leavesLp.rightMargin=dp(8);leavesLp.topMargin=dp(38);viewport.addView(leaves,leavesLp);
+        // 0.18: remove the old rectangular atlas overlays. Keep only a small,
+        // transparent foliage accent so content never looks covered by a red panel.
+        ImageView leaves=new ImageView(this);leaves.setImageResource(R.drawable.koda_leaves);
+        leaves.setScaleType(ImageView.ScaleType.CENTER_INSIDE);leaves.setAlpha(target.equals("Início")?.34f:.18f);
+        FrameLayout.LayoutParams leavesLp=new FrameLayout.LayoutParams(dp(58),dp(118),Gravity.TOP|Gravity.RIGHT);
+        leavesLp.rightMargin=dp(7);leavesLp.topMargin=dp(12);viewport.addView(leaves,leavesLp);
 
         viewport.addView(new PetalOverlay(this),screenFit.centered());
         setContentView(viewport);

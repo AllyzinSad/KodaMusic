@@ -54,10 +54,22 @@ final class Catalog {
         });
     }
     static void related(Anime anime,Result callback){
-        if(cachedAll!=null && System.currentTimeMillis()-cacheTime<1800000){callback.accept(relatedFilter(cachedAll,anime),null);return;}
+        if(cachedAll!=null && System.currentTimeMillis()-cacheTime<1800000){
+            JSONArray snapshot=cachedAll;
+            Net.WORK.execute(()->{
+                List<Anime> result=relatedFilter(snapshot,anime);
+                Net.UI.post(()->callback.accept(result,null));
+            });
+            return;
+        }
         Net.jsonArray("https://animestvs.org/animes",(a,e)->{
             if(e!=null){callback.accept(Collections.singletonList(anime),e.getMessage());return;}
-            cachedAll=a;cacheTime=System.currentTimeMillis();callback.accept(relatedFilter(a,anime),null);
+            cachedAll=a;cacheTime=System.currentTimeMillis();
+            JSONArray snapshot=a;
+            Net.WORK.execute(()->{
+                List<Anime> result=relatedFilter(snapshot,anime);
+                Net.UI.post(()->callback.accept(result,null));
+            });
         });
     }
     private static List<Anime> relatedFilter(JSONArray data,Anime current){
