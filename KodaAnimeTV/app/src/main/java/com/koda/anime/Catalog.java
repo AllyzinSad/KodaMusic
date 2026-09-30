@@ -18,16 +18,42 @@ final class Catalog {
                 JSONObject j=items.optJSONObject(i);if(j==null)continue;
                 String video=j.optString("link_video","");String id=j.optString("id","");
                 if(!video.startsWith("https://")||id.isEmpty()||!ids.add(id))continue;
-                playable.add(new Anime("episode-"+id,j.optString("anime","Anime"),j.optString("image",""),
+                String image=firstNonEmpty(j.optString("image",""),j.optString("imagem",""),j.optString("poster",""),j.optString("capa",""));
+                playable.add(new Anime("episode-"+id,j.optString("anime","Anime"),mediaUrl(image),
                     j.optString("episodio","Episódio recente"),j.optString("tipo","Anime"),0,video));
             }
-            if(!playable.isEmpty())callback.accept(playable,null);
-            else callback.accept(playable,error==null?"Nenhum lançamento disponível.":error.getMessage());
+            if(playable.isEmpty()){callback.accept(playable,error==null?"Nenhum lançamento disponível.":error.getMessage());return;}
+            hydrateRecentPosters(playable,callback);
         });
     }
     static Anime fromSource(JSONObject j){
-        return new Anime("source-"+j.optString("id"),j.optString("titulo","Anime"),j.optString("imagem",""),
+        String image=firstNonEmpty(j.optString("imagem",""),j.optString("image",""),j.optString("poster",""),j.optString("capa",""));
+        return new Anime("source-"+j.optString("id"),j.optString("titulo","Anime"),mediaUrl(image),
             j.optString("sinopse",""),j.optString("generos",""),j.optInt("episodios",0));
+    }
+    private static String firstNonEmpty(String...values){for(String value:values)if(value!=null&&!value.trim().isEmpty())return value.trim();return "";}
+    private static String mediaUrl(String value){
+        if(value==null)return "";String s=value.trim();
+        if(s.startsWith("//"))return "https:"+s;
+        if(s.startsWith("http://"))return "https://"+s.substring(7);
+        if(s.startsWith("/"))return "https://animestvs.org"+s;
+        return s;
+    }
+    private static void hydrateRecentPosters(List<Anime> recent,Result callback){
+        boolean missing=false;for(Anime a:recent)if(a.poster==null||!a.poster.startsWith("https://")){missing=true;break;}
+        if(!missing){callback.accept(recent,null);return;}
+        Net.jsonArray("https://animestvs.org/animes",(all,error)->{
+            if(all==null){callback.accept(recent,null);return;}
+            HashMap<String,Anime> byTitle=new HashMap<>();
+            for(int i=0;i<all.length();i++){JSONObject j=all.optJSONObject(i);if(j==null)continue;Anime full=fromSource(j);byTitle.put(normalize(full.title),full);}
+            ArrayList<Anime> fixed=new ArrayList<>();
+            for(Anime a:recent){
+                Anime full=byTitle.get(normalize(a.title));
+                String poster=a.poster!=null&&a.poster.startsWith("https://")?a.poster:(full==null?"":full.poster);
+                fixed.add(new Anime(a.id,a.title,poster,a.description,a.genre,a.episodes,a.playUrl));
+            }
+            callback.accept(fixed,null);
+        });
     }
     static void search(String query,String genre,Result callback){
         page(query,genre,0,40,callback);
