@@ -65,7 +65,7 @@ final class AnimeDownloads {
             if(d==null)return "Aguardando";
             switch(d.state){
                 case Download.STATE_COMPLETED:return "Concluído";
-                case Download.STATE_DOWNLOADING:return d.percentDownloaded>=0?Math.round(d.percentDownloaded)+"%":"Baixando";
+                case Download.STATE_DOWNLOADING:return d.getPercentDownloaded()>=0?Math.round(d.getPercentDownloaded())+"%":"Baixando";
                 case Download.STATE_QUEUED:return "Na fila";
                 case Download.STATE_FAILED:return "Falhou";
                 case Download.STATE_STOPPED:return "Pausado";
