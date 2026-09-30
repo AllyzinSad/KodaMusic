@@ -94,13 +94,22 @@ final class Net {
         finally { c.disconnect(); }
     }
     static String enc(String s) { try { return URLEncoder.encode(s, "UTF-8"); } catch(Exception e){return s;} }
+    private static byte[] readImage(InputStream in) throws IOException {
+        ByteArrayOutputStream out=new ByteArrayOutputStream();byte[] buffer=new byte[8192];int n;
+        while((n=in.read(buffer))!=-1){if(out.size()+n>6*1024*1024)throw new IOException("Imagem muito grande");out.write(buffer,0,n);}
+        return out.toByteArray();
+    }
     static void image(String url, ImageView view) {
         if (url == null || !url.startsWith("https://")) return;
         view.setTag(url);
         Bitmap cached=IMAGE_CACHE.get(url);if(cached!=null){view.setImageBitmap(cached);return;}
         IMAGES.execute(() -> { try {
             HttpURLConnection c=(HttpURLConnection)new URL(url).openConnection(); c.setConnectTimeout(7000); c.setReadTimeout(8000);
-            try(InputStream in=c.getInputStream()) { BitmapFactory.Options opts=new BitmapFactory.Options();opts.inSampleSize=2;Bitmap b=BitmapFactory.decodeStream(in,null,opts);if(b!=null)IMAGE_CACHE.put(url,b); UI.post(() -> {if(url.equals(view.getTag()) && b!=null) view.setImageBitmap(b);}); }
+            try(InputStream in=c.getInputStream()) { BitmapFactory.Options opts=new BitmapFactory.Options();byte[] bytes=readImage(in);
+                opts.inJustDecodeBounds=true;BitmapFactory.decodeByteArray(bytes,0,bytes.length,opts);
+                opts.inSampleSize=1;
+                while(opts.outWidth/opts.inSampleSize>768 || opts.outHeight/opts.inSampleSize>768)opts.inSampleSize*=2;
+                opts.inJustDecodeBounds=false;Bitmap b=BitmapFactory.decodeByteArray(bytes,0,bytes.length,opts);if(b!=null)IMAGE_CACHE.put(url,b); UI.post(() -> {if(url.equals(view.getTag()) && b!=null) view.setImageBitmap(b);}); }
             finally { c.disconnect(); }
         } catch(Exception ignored) {} });
     }

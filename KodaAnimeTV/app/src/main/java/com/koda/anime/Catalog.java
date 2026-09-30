@@ -33,10 +33,16 @@ final class Catalog {
         page(query,genre,0,40,callback);
     }
     static void page(String query,String genre,int offset,int limit,Result callback){
-        if(cachedAll!=null && System.currentTimeMillis()-cacheTime<1800000){callback.accept(filter(cachedAll,query,genre,offset,limit),null);return;}
+        if(cachedAll!=null && System.currentTimeMillis()-cacheTime<1800000){filterAsync(cachedAll,query,genre,offset,limit,callback);return;}
         Net.jsonArray("https://animestvs.org/animes",(a,e)->{
             if(e!=null){callback.accept(Collections.emptyList(),e.getMessage());return;}
-            cachedAll=a;cacheTime=System.currentTimeMillis();callback.accept(filter(a,query,genre,offset,limit),null);
+            cachedAll=a;cacheTime=System.currentTimeMillis();filterAsync(a,query,genre,offset,limit,callback);
+        });
+    }
+    private static void filterAsync(JSONArray data,String query,String genre,int offset,int limit,Result callback){
+        Net.WORK.execute(()->{
+            List<Anime> result=filter(data,query,genre,offset,limit);
+            Net.UI.post(()->callback.accept(result,null));
         });
     }
     static void kitsuSearch(String query,Result callback){
@@ -89,7 +95,7 @@ final class Catalog {
     static void episodes(Anime anime,Result callback){
         String type=anime.title.toLowerCase(Locale.ROOT).contains("dublado")?"animes-dublados":"animes-legendados";
         String endpoint="https://animestvs.org/"+type+"/"+Net.enc(anime.title).replace("+","%20")+"/episodios";
-        Net.jsonArray(endpoint,(a,e)->{
+        Net.jsonArray(endpoint,(a,e)->Net.WORK.execute(()->{
             ArrayList<Anime> found=new ArrayList<>();
             if(a!=null)for(int i=0;i<a.length();i++){
                 JSONObject j=a.optJSONObject(i);if(j==null)continue;
@@ -100,8 +106,8 @@ final class Catalog {
                 if(!present)found.add(new Anime(anime.id,anime.title,anime.poster,anime.description,anime.genre,anime.episodes,anime.playUrl));
             }
             found.sort((x,y)->episodeNumber(x.description)-episodeNumber(y.description));
-            callback.accept(found,e==null?null:e.getMessage());
-        });
+            Net.UI.post(()->callback.accept(found,e==null?null:e.getMessage()));
+        }));
     }
     static int episodeNumber(String label){java.util.regex.Matcher m=java.util.regex.Pattern.compile("\\d+").matcher(label);return m.find()?Integer.parseInt(m.group()):0;}
     static int seasonNumber(String title){
