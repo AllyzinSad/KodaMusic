@@ -3,11 +3,11 @@ android {
     namespace 'com.koda.anime'
     compileSdk 35
     defaultConfig {
-        applicationId 'com.koda.anime.tv'
+        applicationId 'com.koda.anime.mobile'
         minSdk 23
         targetSdk 35
-        versionCode 24
-        versionName '0.19.3'
+        versionCode 1
+        versionName '0.1-alpha'
     }
     compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
 }

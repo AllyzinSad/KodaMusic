@@ -1,0 +1,26 @@
+name: Koda Anime Android APK
+on:
+  push:
+    branches: [ koda-anime-android ]
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - run: gradle -p KodaAnimeTV :app:testDebugUnitTest :app:assembleDebug --stacktrace
+      - name: Package source
+        run: zip -qr KodaAnimeAndroid-0.1-alpha-source.zip KodaAnimeTV -x 'KodaAnimeTV/**/build/**'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: KodaAnimeAndroid-0.1-alpha-delivery
+          path: |
+            KodaAnimeTV/app/build/outputs/apk/debug/app-debug.apk
+            KodaAnimeAndroid-0.1-alpha-source.zip

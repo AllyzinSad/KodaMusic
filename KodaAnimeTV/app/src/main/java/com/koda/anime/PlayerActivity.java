@@ -10,6 +10,7 @@ import android.view.*;
 import android.widget.*;
 import androidx.media3.common.*;
 import androidx.media3.exoplayer.ExoPlayer;
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory;
 import androidx.media3.ui.AspectRatioFrameLayout;
 import androidx.media3.ui.PlayerView;
 import java.util.*;
@@ -135,7 +136,7 @@ public final class PlayerActivity extends Activity {
 
     @Override protected void onStart(){
         super.onStart();if(url==null||player!=null)return;
-        player=new ExoPlayer.Builder(this).build();video.setPlayer(player);
+        player=new ExoPlayer.Builder(this).setMediaSourceFactory(new DefaultMediaSourceFactory(AnimeDownloads.dataSourceFactory(this))).build();video.setPlayer(player);
         player.addListener(new Player.Listener(){
             @Override public void onPlayerError(PlaybackException e){Toast.makeText(PlayerActivity.this,"Não foi possível reproduzir: "+e.getErrorCodeName(),Toast.LENGTH_LONG).show();showControls();}
             @Override public void onPlaybackStateChanged(int state){
