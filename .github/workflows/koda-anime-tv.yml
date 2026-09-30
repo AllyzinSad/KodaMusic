@@ -22,10 +22,10 @@ jobs:
           gradle-version: '8.9'
       - run: gradle -p KodaAnimeTV :app:testDebugUnitTest :app:assembleDebug --stacktrace
       - name: Package source
-        run: zip -qr KodaAnimeTV-0.19.1-source.zip KodaAnimeTV -x 'KodaAnimeTV/**/build/**'
+        run: zip -qr KodaAnimeTV-0.19.2-source.zip KodaAnimeTV -x 'KodaAnimeTV/**/build/**'
       - uses: actions/upload-artifact@v4
         with:
-          name: KodaAnimeTV-0.19.1-delivery
+          name: KodaAnimeTV-0.19.2-delivery
           path: |
             KodaAnimeTV/app/build/outputs/apk/debug/app-debug.apk
-            KodaAnimeTV-0.19.1-source.zip
+            KodaAnimeTV-0.19.2-source.zip

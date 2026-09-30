@@ -22,8 +22,8 @@ public final class PlayerActivity extends Activity {
     private ImageButton playPause,rewind,forward;
     private TextView next,skip,quality,audio,subtitles,heading,time;
     private SeekBar progress; private View tap;
-    private boolean tracking;
-    private long startPosition,openingEndMs=-1;
+    private boolean tracking,skipLookupStarted;
+    private long startPosition,openingStartMs=-1,openingEndMs=-1;
     private String url,title,animeId,poster,episode,nextUrl,nextLabel;
     private ScreenFit screenFit;
 
@@ -55,7 +55,8 @@ public final class PlayerActivity extends Activity {
     @Override public void onCreate(Bundle state){
         super.onCreate(state);
         Intent i=getIntent();url=i.getStringExtra("url");title=i.getStringExtra("title");animeId=i.getStringExtra("animeId");poster=i.getStringExtra("poster");episode=i.getStringExtra("episode");
-        nextUrl=i.getStringExtra("nextUrl");nextLabel=i.getStringExtra("nextLabel");startPosition=i.getLongExtra("startPosition",0);openingEndMs=i.getLongExtra("openingEndMs",-1);
+        nextUrl=i.getStringExtra("nextUrl");nextLabel=i.getStringExtra("nextLabel");startPosition=i.getLongExtra("startPosition",0);
+        openingStartMs=i.getLongExtra("openingStartMs",-1);openingEndMs=i.getLongExtra("openingEndMs",-1);
         if(url==null||!url.startsWith("https://")){Toast.makeText(this,"URL HTTPS inválida",Toast.LENGTH_LONG).show();finish();return;}
 
         ScreenFit.immersive(this);screenFit=new ScreenFit(this);
@@ -89,7 +90,12 @@ public final class PlayerActivity extends Activity {
         addCircle(rewind,94);addCircle(playPause,112);addCircle(forward,94);
         controlsLayer.addView(centerRow,new FrameLayout.LayoutParams(-1,-2,Gravity.CENTER));
 
-        skip=pill(KodaIcon.SKIP,"Pular abertura",()->{if(player!=null&&openingEndMs>0&&openingEndMs>player.getCurrentPosition())seekTo(openingEndMs);});
+        skip=pill(KodaIcon.SKIP,"Pular abertura",()->{
+            if(player!=null&&openingStartMs>=0&&openingEndMs>openingStartMs){
+                long pos=player.getCurrentPosition();
+                if(pos>=openingStartMs&&pos<openingEndMs)seekTo(openingEndMs);
+            }
+        });
         FrameLayout.LayoutParams skp=new FrameLayout.LayoutParams(dp(186),dp(48),Gravity.BOTTOM|Gravity.RIGHT);skp.rightMargin=dp(28);skp.bottomMargin=dp(106);controlsLayer.addView(skip,skp);skip.setVisibility(View.GONE);
 
         LinearLayout seekWrap=new LinearLayout(this);seekWrap.setGravity(Gravity.CENTER_VERTICAL);
@@ -123,7 +129,7 @@ public final class PlayerActivity extends Activity {
     private void update(){
         if(player==null)return;long pos=Math.max(0,player.getCurrentPosition()),dur=Math.max(0,player.getDuration());
         playPause.setImageDrawable(new KodaIcon(player.isPlaying()?KodaIcon.PAUSE:KodaIcon.PLAY,WHITE));
-        skip.setVisibility(openingEndMs>0&&pos<openingEndMs?View.VISIBLE:View.GONE);
+        skip.setVisibility(openingStartMs>=0&&openingEndMs>openingStartMs&&pos>=openingStartMs&&pos<openingEndMs?View.VISIBLE:View.GONE);
         if(!tracking){time.setText(format(pos)+" / "+format(dur));progress.setProgress(dur>0?(int)Math.min(1000,pos*1000/dur):0);}
     }
 
@@ -132,7 +138,11 @@ public final class PlayerActivity extends Activity {
         player=new ExoPlayer.Builder(this).build();video.setPlayer(player);
         player.addListener(new Player.Listener(){
             @Override public void onPlayerError(PlaybackException e){Toast.makeText(PlayerActivity.this,"Não foi possível reproduzir: "+e.getErrorCodeName(),Toast.LENGTH_LONG).show();showControls();}
-            @Override public void onPlaybackStateChanged(int state){if(state==Player.STATE_ENDED){save(true);showControls();}update();}
+            @Override public void onPlaybackStateChanged(int state){
+                if(state==Player.STATE_READY)loadOpeningSkip();
+                if(state==Player.STATE_ENDED){save(true);showControls();}
+                update();
+            }
             @Override public void onIsPlayingChanged(boolean isPlaying){update();}
         });
         player.setMediaItem(MediaItem.fromUri(url));player.prepare();if(startPosition>0)player.seekTo(startPosition);player.play();
@@ -144,8 +154,79 @@ public final class PlayerActivity extends Activity {
     private void save(boolean ended){if(player==null||animeId==null)return;long d=Math.max(0,player.getDuration());long pos=ended&&d>0?d:Math.max(0,player.getCurrentPosition());startPosition=pos;WatchHistory.save(this,animeId,title==null?"Anime":title,poster==null?"":poster,episode==null?"Episódio":episode,url,pos,d);}
 
     private void playNext(){
-        if(nextUrl==null||!nextUrl.startsWith("https://"))return;save(false);url=nextUrl;episode=nextLabel;nextUrl="";nextLabel="";next.setVisibility(View.GONE);startPosition=0;openingEndMs=-1;
+        if(nextUrl==null||!nextUrl.startsWith("https://"))return;save(false);url=nextUrl;episode=nextLabel;nextUrl="";nextLabel="";next.setVisibility(View.GONE);startPosition=0;
+        openingStartMs=-1;openingEndMs=-1;skipLookupStarted=false;skip.setVisibility(View.GONE);
         heading.setText((episode==null?"Episódio":episode)+"\n"+title);player.setMediaItem(MediaItem.fromUri(url));player.prepare();player.play();showControls();
+    }
+
+    /**
+     * Loads real opening timestamps from AniSkip. The button is only enabled for
+     * a timestamp returned for the exact MAL title + episode; there is no
+     * hard-coded 90-second fallback and playback is never skipped automatically.
+     */
+    private void loadOpeningSkip(){
+        if(skipLookupStarted||player==null||openingEndMs>openingStartMs)return;
+        long durationMs=player.getDuration();
+        if(durationMs<=0||durationMs==C.TIME_UNSET)return;
+        int epNo=Catalog.episodeNumber(episode==null?"":episode);
+        if(epNo<=0)return;
+
+        String cleanTitle=(title==null?"":title).replaceAll("(?i)\\s*\\(dublado\\)\\s*$","").trim();
+        if(cleanTitle.isEmpty())return;
+        skipLookupStarted=true;
+
+        String target=Catalog.normalize(cleanTitle);
+        Net.json("https://api.jikan.moe/v4/anime?q="+Net.enc(cleanTitle)+"&limit=5",(json,error)->{
+            if(error!=null||json==null){skipLookupStarted=false;return;}
+            int malId=findExactMalId(json,target);
+            if(malId<=0)return;
+
+            long seconds=Math.max(1,Math.round(durationMs/1000.0));
+            String endpoint="https://api.aniskip.com/v2/skip-times/"+malId+"/"+epNo+
+                "?types[]=op&types[]=mixed-op&episodeLength="+seconds;
+            Net.json(endpoint,(skipJson,skipError)->{
+                if(skipError!=null||skipJson==null)return;
+                org.json.JSONArray results=skipJson.optJSONArray("results");
+                if(results==null)return;
+
+                double bestStart=-1,bestEnd=-1;
+                for(int i=0;i<results.length();i++){
+                    org.json.JSONObject item=results.optJSONObject(i);if(item==null)continue;
+                    String type=item.optString("skipType","");
+                    if(!"op".equals(type)&&!"mixed-op".equals(type))continue;
+                    org.json.JSONObject interval=item.optJSONObject("interval");if(interval==null)continue;
+                    double start=interval.optDouble("startTime",-1),end=interval.optDouble("endTime",-1);
+                    double len=end-start;
+                    if(start<0||end<=start||len<15||len>240||end>seconds+8)continue;
+                    if(bestStart<0||"op".equals(type)){bestStart=start;bestEnd=end;if("op".equals(type))break;}
+                }
+                if(bestStart>=0&&bestEnd>bestStart){
+                    openingStartMs=Math.round(bestStart*1000.0);
+                    openingEndMs=Math.round(bestEnd*1000.0);
+                    update();
+                }
+            });
+        });
+    }
+
+    private int findExactMalId(org.json.JSONObject json,String target){
+        org.json.JSONArray data=json.optJSONArray("data");if(data==null)return 0;
+        for(int i=0;i<data.length();i++){
+            org.json.JSONObject item=data.optJSONObject(i);if(item==null)continue;
+            if(matchesTitle(item.optString("title",""),target)||
+               matchesTitle(item.optString("title_english",""),target)||
+               matchesTitle(item.optString("title_japanese",""),target))return item.optInt("mal_id",0);
+            org.json.JSONArray titles=item.optJSONArray("titles");
+            if(titles!=null)for(int n=0;n<titles.length();n++){
+                org.json.JSONObject t=titles.optJSONObject(n);
+                if(t!=null&&matchesTitle(t.optString("title",""),target))return item.optInt("mal_id",0);
+            }
+        }
+        return 0;
+    }
+
+    private boolean matchesTitle(String candidate,String target){
+        return candidate!=null&&!candidate.isEmpty()&&Catalog.normalize(candidate).equals(target);
     }
 
     private String trackName(Format f,int index){if(f.label!=null&&!f.label.trim().isEmpty())return f.label;if(f.language!=null&&!f.language.trim().isEmpty())return f.language.toUpperCase(Locale.ROOT);if(f.height>0)return f.height+"p";if(f.bitrate>0)return (f.bitrate/1000)+" kbps";return "Faixa "+(index+1);}
