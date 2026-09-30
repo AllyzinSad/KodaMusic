@@ -251,15 +251,15 @@ public final class MobileMainActivity extends AppCompatActivity {
     }
 
     private void renderEpisodeRange(Anime a,List<Anime> eps,LinearLayout list,int start){
-        list.removeAllViews();int safe=Math.max(0,Math.min(start,Math.max(0,eps.size()-1)));safe=(safe/50)*50;int end=Math.min(safe+50,eps.size());
+        list.removeAllViews();int safe=Math.max(0,Math.min(start,Math.max(0,eps.size()-1)));safe=(safe/50)*50;final int rangeStart=safe;int end=Math.min(rangeStart+50,eps.size());
         if(eps.size()>50){
             LinearLayout ranges=new LinearLayout(this);ranges.setGravity(Gravity.CENTER_VERTICAL);
-            TextView prev=action("‹",false,()->renderEpisodeRange(a,eps,list,Math.max(0,safe-50)));prev.setEnabled(safe>0);ranges.addView(prev,new LinearLayout.LayoutParams(dp(46),dp(40)));
-            TextView range=text((safe+1)+"–"+end+" de "+eps.size(),13,WHITE,true);range.setGravity(Gravity.CENTER);ranges.addView(range,new LinearLayout.LayoutParams(0,dp(40),1));
+            TextView prev=action("‹",false,()->renderEpisodeRange(a,eps,list,Math.max(0,rangeStart-50)));prev.setEnabled(rangeStart>0);ranges.addView(prev,new LinearLayout.LayoutParams(dp(46),dp(40)));
+            TextView range=text((rangeStart+1)+"–"+end+" de "+eps.size(),13,WHITE,true);range.setGravity(Gravity.CENTER);ranges.addView(range,new LinearLayout.LayoutParams(0,dp(40),1));
             TextView next=action("›",false,()->renderEpisodeRange(a,eps,list,end));next.setEnabled(end<eps.size());ranges.addView(next,new LinearLayout.LayoutParams(dp(46),dp(40)));
             LinearLayout.LayoutParams rlp=new LinearLayout.LayoutParams(-1,dp(44));rlp.bottomMargin=dp(10);list.addView(ranges,rlp);
         }
-        for(int i=safe;i<end;i++){
+        for(int i=rangeStart;i<end;i++){
             final int index=i;Anime ep=eps.get(i);WatchHistory.Entry hist=WatchHistory.find(this,historyId(a),ep.description);
             LinearLayout row=new LinearLayout(this);row.setGravity(Gravity.CENTER_VERTICAL);row.setPadding(dp(12),dp(9),dp(8),dp(9));row.setBackground(rounded(SURFACE,11));
             LinearLayout info=new LinearLayout(this);info.setOrientation(LinearLayout.VERTICAL);row.addView(info,new LinearLayout.LayoutParams(0,-2,1));
