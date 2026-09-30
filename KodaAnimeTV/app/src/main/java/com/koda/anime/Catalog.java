@@ -49,6 +49,13 @@ final class Catalog {
             ArrayList<Anime> fixed=new ArrayList<>();
             for(Anime a:recent){
                 Anime full=byTitle.get(normalize(a.title));
+                if(full==null){
+                    String key=franchiseKey(a.title);
+                    for(Anime candidate:byTitle.values()){
+                        String ck=franchiseKey(candidate.title);
+                        if(!key.isEmpty() && (key.equals(ck)||key.contains(ck)||ck.contains(key))){full=candidate;break;}
+                    }
+                }
                 String poster=a.poster!=null&&a.poster.startsWith("https://")?a.poster:(full==null?"":full.poster);
                 fixed.add(new Anime(a.id,a.title,poster,a.description,a.genre,a.episodes,a.playUrl));
             }

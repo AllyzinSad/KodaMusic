@@ -161,8 +161,9 @@ public final class MobileMainActivity extends AppCompatActivity {
         final int g=generation;
         Catalog.recommendations((list,error)->{
             if(g!=generation)return;recommended.removeAllViews();
-            if(!list.isEmpty())renderHero(hero,list.get(0));
-            for(Anime a:list)recommended.addView(animeCard(a));
+            List<Anime> grouped=Catalog.collapseFranchises(list);
+            if(!grouped.isEmpty())renderHero(hero,grouped.get(0));
+            for(Anime a:grouped)recommended.addView(animeCard(a));
             if(list.isEmpty())recommended.addView(text(error==null?"Nada disponível agora.":error,13,MUTED,false));
         });
         Catalog.recent((list,error)->{
@@ -199,14 +200,18 @@ public final class MobileMainActivity extends AppCompatActivity {
 
     private void searchNow(String query,LinearLayout results){
         results.removeAllViews();if(query.trim().isEmpty())return;results.addView(text("Buscando…",14,MUTED,false));
-        Catalog.search(query,"",(list,error)->{results.removeAllViews();for(Anime a:list)results.addView(searchRow(a));if(list.isEmpty())emptyInto(results,"⌕","Nada encontrado","Tente outro nome ou uma parte do título.");});
+        Catalog.search(query,"",(list,error)->{
+            results.removeAllViews();List<Anime> grouped=Catalog.collapseFranchises(list);
+            for(Anime a:grouped)results.addView(searchRow(a));
+            if(grouped.isEmpty())emptyInto(results,"⌕","Nada encontrado","Tente outro nome ou uma parte do título.");
+        });
     }
 
     private View searchRow(Anime a){
         LinearLayout row=new LinearLayout(this);row.setGravity(Gravity.CENTER_VERTICAL);row.setPadding(dp(10),dp(9),dp(10),dp(9));row.setClickable(true);row.setBackground(rounded(SURFACE,12));
         ImageView img=new ImageView(this);img.setScaleType(ImageView.ScaleType.CENTER_CROP);row.addView(img,new LinearLayout.LayoutParams(dp(66),dp(92)));loadPoster(a.poster,img);
         LinearLayout info=new LinearLayout(this);info.setOrientation(LinearLayout.VERTICAL);info.setPadding(dp(12),0,0,0);row.addView(info,new LinearLayout.LayoutParams(0,-2,1));
-        info.addView(text(a.title,15,WHITE,true));TextView d=text(a.description,12,MUTED,false);d.setMaxLines(2);info.addView(d);
+        info.addView(text(Catalog.seriesTitle(a.title),15,WHITE,true));TextView d=text(a.description,12,MUTED,false);d.setMaxLines(2);info.addView(d);
         TextView chevron=text("›",26,MUTED,false);chevron.setGravity(Gravity.CENTER);row.addView(chevron,new LinearLayout.LayoutParams(dp(32),-1));
         row.setOnClickListener(v->showDetails(a));LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,dp(110));lp.bottomMargin=dp(9);row.setLayoutParams(lp);return row;
     }
@@ -217,14 +222,33 @@ public final class MobileMainActivity extends AppCompatActivity {
         ImageView poster=new ImageView(this);poster.setScaleType(ImageView.ScaleType.CENTER_CROP);hero.addView(poster,new FrameLayout.LayoutParams(-1,-1));loadPoster(a.poster,poster);
         View shade=new View(this);shade.setBackground(new GradientDrawable(GradientDrawable.Orientation.BOTTOM_TOP,new int[]{0xFA070709,0xB8070709,0x20070709}));hero.addView(shade,new FrameLayout.LayoutParams(-1,-1));
         LinearLayout heroText=new LinearLayout(this);heroText.setOrientation(LinearLayout.VERTICAL);heroText.setPadding(dp(15),0,dp(15),dp(14));FrameLayout.LayoutParams htp=new FrameLayout.LayoutParams(-1,-2,Gravity.BOTTOM);hero.addView(heroText,htp);
-        TextView t=text(a.title,24,WHITE,true);t.setMaxLines(2);heroText.addView(t);
-        TextView meta=text((a.title.toLowerCase(Locale.ROOT).contains("dublado")?"Dublado":"Legendado")+"  •  Anime",11,0xFFD0D0D6,false);heroText.addView(meta);
+        TextView t=text(Catalog.seriesTitle(a.title),24,WHITE,true);t.setMaxLines(2);heroText.addView(t);
+        TextView meta=text(Catalog.seasonLabel(a.title)+"  •  "+(a.title.toLowerCase(Locale.ROOT).contains("dublado")?"Dublado":"Legendado"),11,0xFFD0D0D6,false);heroText.addView(meta);
 
         TextView d=text(a.description.isEmpty()?"Selecione um episódio para assistir.":a.description,13,MUTED,false);d.setMaxLines(4);LinearLayout.LayoutParams dlp=new LinearLayout.LayoutParams(-1,-2);dlp.topMargin=dp(12);content.addView(d,dlp);
         LinearLayout buttons=new LinearLayout(this);LinearLayout.LayoutParams blp=new LinearLayout.LayoutParams(-1,dp(48));blp.topMargin=dp(12);content.addView(buttons,blp);
         TextView first=action("▶ Assistir",true,()->playFirst(a));buttons.addView(first,new LinearLayout.LayoutParams(0,-1,1));
         View g=new View(this);buttons.addView(g,new LinearLayout.LayoutParams(dp(9),1));
         TextView fav=action(isFavorite(a)?"♥ Favorito":"♡ Favoritar",false,()->{toggleFavorite(a);showDetails(a);});buttons.addView(fav,new LinearLayout.LayoutParams(0,-1,1));
+
+        TextView seasonHeading=section("Temporadas");
+        HorizontalScrollView seasonScroll=new HorizontalScrollView(this);seasonScroll.setHorizontalScrollBarEnabled(false);
+        LinearLayout seasonRow=new LinearLayout(this);seasonRow.setOrientation(LinearLayout.HORIZONTAL);seasonScroll.addView(seasonRow);
+        content.addView(seasonScroll,new LinearLayout.LayoutParams(-1,dp(48)));
+
+        TextView audioHeading=section("Versão");
+        HorizontalScrollView audioScroll=new HorizontalScrollView(this);audioScroll.setHorizontalScrollBarEnabled(false);
+        LinearLayout audioRow=new LinearLayout(this);audioRow.setOrientation(LinearLayout.HORIZONTAL);audioScroll.addView(audioRow);
+        content.addView(audioScroll,new LinearLayout.LayoutParams(-1,dp(48)));
+
+        Catalog.related(a,(related,relatedError)->{
+            if(!page.equals("Detalhes")||selectedAnime!=a)return;
+            populateSeasonControls(a,related,seasonRow,audioRow);
+            seasonHeading.setVisibility(seasonRow.getChildCount()>1?View.VISIBLE:View.GONE);
+            seasonScroll.setVisibility(seasonRow.getChildCount()>1?View.VISIBLE:View.GONE);
+            audioHeading.setVisibility(audioRow.getChildCount()>1?View.VISIBLE:View.GONE);
+            audioScroll.setVisibility(audioRow.getChildCount()>1?View.VISIBLE:View.GONE);
+        });
 
         section("Episódios");
         TextView jump=action("Ir para episódio",false,()->{});content.addView(jump,new LinearLayout.LayoutParams(-1,dp(44)));
@@ -239,6 +263,46 @@ public final class MobileMainActivity extends AppCompatActivity {
             int initial=0;for(WatchHistory.Entry e:WatchHistory.all(this))if(e.animeId.equals(historyId(a))){int n=Catalog.episodeNumber(e.episode);if(n>0)initial=((n-1)/50)*50;break;}
             renderEpisodeRange(a,eps,list,initial);
         });
+    }
+
+    private void populateSeasonControls(Anime current,List<Anime> related,LinearLayout seasonRow,LinearLayout audioRow){
+        seasonRow.removeAllViews();audioRow.removeAllViews();
+        ArrayList<Anime> ordered=new ArrayList<>(related);
+        ordered.sort((x,y)->{
+            int sx=Catalog.seasonNumber(x.title),sy=Catalog.seasonNumber(y.title);
+            if(sx!=sy)return sx-sy;
+            boolean xd=x.title.toLowerCase(Locale.ROOT).contains("dublado"),yd=y.title.toLowerCase(Locale.ROOT).contains("dublado");
+            return xd==yd?x.title.compareToIgnoreCase(y.title):(xd?-1:1);
+        });
+
+        String selectedSeason=Catalog.seasonLabel(current.title);
+        boolean selectedDub=current.title.toLowerCase(Locale.ROOT).contains("dublado");
+        LinkedHashSet<String> seasons=new LinkedHashSet<>();
+        for(Anime x:ordered)seasons.add(Catalog.seasonLabel(x.title));
+
+        for(String season:seasons){
+            Anime target=findVersion(ordered,season,selectedDub,true);
+            if(target==null)continue;
+            TextView chip=action(season,season.equals(selectedSeason),()->showDetails(target));
+            LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(dp(126),dp(42));lp.rightMargin=dp(8);seasonRow.addView(chip,lp);
+        }
+
+        for(boolean wantDub:new boolean[]{true,false}){
+            Anime target=findVersion(ordered,selectedSeason,wantDub,false);
+            if(target==null)continue;
+            String label=wantDub?"Dublado":"Legendado";
+            TextView chip=action(label,wantDub==selectedDub,()->showDetails(target));
+            LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(dp(126),dp(42));lp.rightMargin=dp(8);audioRow.addView(chip,lp);
+        }
+    }
+
+    private Anime findVersion(List<Anime> related,String season,boolean dubbed,boolean fallback){
+        for(Anime variant:related){
+            boolean dub=variant.title.toLowerCase(Locale.ROOT).contains("dublado");
+            if(Catalog.seasonLabel(variant.title).equals(season)&&dub==dubbed)return variant;
+        }
+        if(fallback)for(Anime variant:related)if(Catalog.seasonLabel(variant.title).equals(season))return variant;
+        return null;
     }
 
     private void jumpDialog(Anime a,List<Anime> eps,LinearLayout list){
