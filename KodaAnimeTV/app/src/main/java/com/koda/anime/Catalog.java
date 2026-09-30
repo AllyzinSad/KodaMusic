@@ -114,10 +114,35 @@ final class Catalog {
         if(!hasCurrent)list.add(current);
         list.sort((a,b)->{int n=seasonNumber(a.title)-seasonNumber(b.title);return n!=0?n:a.title.compareToIgnoreCase(b.title);});return list;
     }
-    private static String franchiseKey(String title){
+    static String franchiseKey(String title){
         String value=normalize(title).replaceFirst("^(?:5toubun|gotoubun)","gotoubun");String last;
-        do{last=value;value=value.replaceFirst("(?:\\d+(?:st|nd|rd|th)?season|season\\d+|s\\d+|movie|special|ova|\\d+)$","");}while(!last.equals(value));
+        do{
+            last=value;
+            value=value
+                .replaceFirst("(?:part|cour)\\d+$","")
+                .replaceFirst("\\d+(?:st|nd|rd|th)?season(?:part\\d+)?$","")
+                .replaceFirst("(?:season|temporada)\\d+(?:part\\d+)?$","")
+                .replaceFirst("s\\d+(?:part\\d+)?$","")
+                .replaceFirst("(?:finalseason|movie|special|ova|ona|specials?)$","")
+                .replaceFirst("\\d+$","");
+        }while(!last.equals(value));
         return value;
+    }
+    static String seriesTitle(String title){
+        if(title==null)return "Anime";
+        String s=title.replaceAll("(?i)\\s*\\((?:dublado|legendado)\\)\\s*$","").trim();
+        s=s.replaceAll("(?i)\\s+(?:parte|part|cour)\\s*\\d+\\s*$","").trim();
+        s=s.replaceAll("(?i)\\s+(?:\\d+(?:st|nd|rd|th)?\\s*season|season\\s*\\d+|temporada\\s*\\d+|s\\d+)\\s*$","").trim();
+        return s.isEmpty()?title:s;
+    }
+    static List<Anime> collapseFranchises(List<Anime> source){
+        LinkedHashMap<String,Anime> out=new LinkedHashMap<>();
+        for(Anime a:source){
+            String key=franchiseKey(a.title);if(key.isEmpty())key=normalize(a.title);
+            Anime previous=out.get(key);
+            if(previous==null || seasonNumber(a.title)<seasonNumber(previous.title))out.put(key,a);
+        }
+        return new ArrayList<>(out.values());
     }
     static void episodes(Anime anime,Result callback){
         String type=anime.title.toLowerCase(Locale.ROOT).contains("dublado")?"animes-dublados":"animes-legendados";
