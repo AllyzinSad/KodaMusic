@@ -12,7 +12,7 @@ import android.widget.*;
 import java.util.*;
 
 public final class MainActivity extends androidx.appcompat.app.AppCompatActivity {
-    private static final int BLACK=0xFF08080A, SIDE=0xFF0E0E12, RED=0xFFFF1635, RED_DARK=0xFF9E001B, WHITE=0xFFFFFFFF, MUTED=0xFFB8B8C0; private static final String VERSION="0.19.1";
+    private static final int BLACK=0xFF08080A, SIDE=0xFF0E0E12, RED=0xFFFF1635, RED_DARK=0xFF9E001B, WHITE=0xFFFFFFFF, MUTED=0xFFB8B8C0; private static final String VERSION="0.19.3";
     private LinearLayout content,nav; private String page="Início"; private boolean playerOpened; private Anime selectedAnime; private String returnPage="Início",detailFocus=""; private int searchGeneration; private final Map<String,Anime> seen=new LinkedHashMap<>();
     private Anime heroAnime; private ImageView homeHeroImage; private TextView homeHeroTitle,homeHeroDescription,homeHeroWatch;
     private final ArrayList<TextView> navButtons=new ArrayList<>();
@@ -339,9 +339,12 @@ public final class MainActivity extends androidx.appcompat.app.AppCompatActivity
         LinearLayout audio=new LinearLayout(this);panel.addView(audio);
         View divider=new View(this);divider.setBackgroundColor(0xFF34343A);LinearLayout.LayoutParams dl=new LinearLayout.LayoutParams(-1,dp(1));dl.topMargin=dp(18);dl.bottomMargin=dp(16);panel.addView(divider,dl);
         TextView count=label("Carregando episódios...",15,MUTED,false);panel.addView(count);
+        HorizontalScrollView episodeRangeScroll=new HorizontalScrollView(this);episodeRangeScroll.setHorizontalScrollBarEnabled(false);episodeRangeScroll.setClipToPadding(false);
+        LinearLayout episodeRanges=new LinearLayout(this);episodeRanges.setOrientation(LinearLayout.HORIZONTAL);episodeRangeScroll.addView(episodeRanges);
+        LinearLayout.LayoutParams erp=new LinearLayout.LayoutParams(-1,dp(50));erp.topMargin=dp(10);panel.addView(episodeRangeScroll,erp);
         HorizontalScrollView episodeScroll=new HorizontalScrollView(this);episodeScroll.setHorizontalScrollBarEnabled(false);episodeScroll.setClipToPadding(false);
         LinearLayout episodeList=new LinearLayout(this);episodeList.setOrientation(LinearLayout.HORIZONTAL);episodeScroll.addView(episodeList);
-        LinearLayout.LayoutParams ep=new LinearLayout.LayoutParams(-1,dp(126));ep.topMargin=dp(10);panel.addView(episodeScroll,ep);
+        LinearLayout.LayoutParams ep=new LinearLayout.LayoutParams(-1,dp(126));ep.topMargin=dp(8);panel.addView(episodeScroll,ep);
         TextView relatedTitle=label("RELACIONADOS",13,MUTED,true);LinearLayout.LayoutParams rtp=new LinearLayout.LayoutParams(-1,-2);rtp.topMargin=dp(18);rtp.bottomMargin=dp(8);panel.addView(relatedTitle,rtp);
         HorizontalScrollView relatedScroll=new HorizontalScrollView(this);relatedScroll.setHorizontalScrollBarEnabled(false);relatedScroll.setClipToPadding(false);panel.addView(relatedScroll,new LinearLayout.LayoutParams(-1,dp(205)));
         LinearLayout relatedRow=new LinearLayout(this);relatedRow.setOrientation(LinearLayout.HORIZONTAL);relatedScroll.addView(relatedRow);
@@ -363,8 +366,13 @@ public final class MainActivity extends androidx.appcompat.app.AppCompatActivity
             for(Anime variant:ordered)if(!variant.id.equals(a.id))relatedRow.addView(card(variant,false));
             if(relatedRow.getChildCount()==0)relatedRow.addView(label("Nenhum título relacionado disponível.",14,MUTED,false));
         });
-        Catalog.episodes(a,(eps,error)->{if(!page.equals("Detalhes")||selectedAnime!=a)return;episodeList.removeAllViews();
-            if(!eps.isEmpty()){count.setText(eps.size()+" episódios · "+Catalog.seasonLabel(a.title));appendEpisodes(episodeList,a,eps,0);return;}
+        Catalog.episodes(a,(eps,error)->{if(!page.equals("Detalhes")||selectedAnime!=a)return;episodeList.removeAllViews();episodeRanges.removeAllViews();
+            if(!eps.isEmpty()){
+                count.setText(eps.size()+" episódios · "+Catalog.seasonLabel(a.title));
+                setupEpisodeNavigator(episodeRanges,episodeRangeScroll,episodeList,episodeScroll,a,eps);
+                return;
+            }
+            episodeRangeScroll.setVisibility(View.GONE);
             count.setText("Nenhum episódio direto disponível nesta versão");
             Sources.find(this,a,(sources,sourceError)->{if(!page.equals("Detalhes")||selectedAnime!=a)return;
                 for(Sources.Episode source:sources){TextView item=button(source.label,()->Sources.resolve(source,(url,err)->{
@@ -379,23 +387,118 @@ public final class MainActivity extends androidx.appcompat.app.AppCompatActivity
         return null;
     }
     private void addDetailAction(LinearLayout row,View v){LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-2,dp(46));lp.rightMargin=dp(10);row.addView(v,lp);}
-    private void appendEpisodes(LinearLayout host,Anime anime,List<Anime> eps,int start){
-        int end=Math.min(start+24,eps.size());
-        for(int i=start;i<end;i++){
+    private static final int EPISODE_RANGE=50;
+
+    private void setupEpisodeNavigator(LinearLayout ranges,HorizontalScrollView rangeScroll,LinearLayout host,HorizontalScrollView episodeScroll,Anime anime,List<Anime> eps){
+        ranges.removeAllViews();
+        TextView jump=button("Ir para episódio",()->showEpisodeJumpDialog(ranges,rangeScroll,host,episodeScroll,anime,eps));
+        LinearLayout.LayoutParams jumpLp=new LinearLayout.LayoutParams(dp(170),dp(42));jumpLp.rightMargin=dp(10);ranges.addView(jump,jumpLp);
+
+        int initial=0;
+        for(WatchHistory.Entry e:WatchHistory.all(this)){
+            if(!e.animeId.equals(historyId(anime)))continue;
+            int number=Catalog.episodeNumber(e.episode);
+            int idx=findEpisodeIndex(eps,number);
+            if(idx>=0){initial=(idx/EPISODE_RANGE)*EPISODE_RANGE;break;}
+        }
+
+        if(eps.size()>EPISODE_RANGE){
+            for(int start=0;start<eps.size();start+=EPISODE_RANGE){
+                final int rangeStart=start;
+                final int rangeEnd=Math.min(start+EPISODE_RANGE,eps.size());
+                int firstNumber=episodeDisplayNumber(eps,rangeStart);
+                int lastNumber=episodeDisplayNumber(eps,rangeEnd-1);
+                String labelText=firstNumber>0&&lastNumber>=firstNumber?firstNumber+"–"+lastNumber:(rangeStart+1)+"–"+rangeEnd;
+                TextView tab=button(labelText,()->renderEpisodeRange(ranges,host,episodeScroll,anime,eps,rangeStart,-1));
+                tab.setTag(rangeStart);
+                LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(dp(112),dp(42));lp.rightMargin=dp(8);ranges.addView(tab,lp);
+            }
+        }
+        renderEpisodeRange(ranges,host,episodeScroll,anime,eps,initial,-1);
+        rangeScroll.post(()->rangeScroll.scrollTo(0,0));
+    }
+
+    private int episodeDisplayNumber(List<Anime> eps,int index){
+        if(index<0||index>=eps.size())return 0;
+        int parsed=Catalog.episodeNumber(eps.get(index).description);
+        return parsed>0?parsed:index+1;
+    }
+
+    private int findEpisodeIndex(List<Anime> eps,int number){
+        if(number<=0)return -1;
+        for(int i=0;i<eps.size();i++)if(Catalog.episodeNumber(eps.get(i).description)==number)return i;
+        return number<=eps.size()?number-1:-1;
+    }
+
+    private void showEpisodeJumpDialog(LinearLayout ranges,HorizontalScrollView rangeScroll,LinearLayout host,HorizontalScrollView episodeScroll,Anime anime,List<Anime> eps){
+        EditText input=new EditText(this);input.setSingleLine(true);input.setHint("Ex.: 742");input.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
+        input.setTextColor(WHITE);input.setHintTextColor(MUTED);input.setTextSize(18*uiScale());input.setBackground(outline(0xFF1A1A20,RED,9,1));pad(input,14,8,14,8);
+        FrameLayout wrap=new FrameLayout(this);int pad=dp(18);wrap.setPadding(pad,0,pad,0);wrap.addView(input,new FrameLayout.LayoutParams(-1,dp(52)));
+        AlertDialog dialog=new AlertDialog.Builder(this)
+            .setTitle("Ir para episódio")
+            .setMessage("Digite o número do episódio.")
+            .setView(wrap)
+            .setNegativeButton("Cancelar",null)
+            .setPositiveButton("Ir",null)
+            .create();
+        dialog.setOnShowListener(d->{
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{
+                int number;try{number=Integer.parseInt(input.getText().toString().trim());}catch(Exception e){number=-1;}
+                int index=findEpisodeIndex(eps,number);
+                if(index<0){input.setError("Episódio não encontrado");return;}
+                int rangeStart=(index/EPISODE_RANGE)*EPISODE_RANGE;
+                renderEpisodeRange(ranges,host,episodeScroll,anime,eps,rangeStart,index);
+                focusEpisodeRangeTab(ranges,rangeStart);
+                dialog.dismiss();
+            });
+        });
+        dialog.setOnDismissListener(d->rangeScroll.post(()->{}));
+        dialog.show();
+        input.requestFocus();
+    }
+
+    private void focusEpisodeRangeTab(LinearLayout ranges,int start){
+        for(int i=0;i<ranges.getChildCount();i++){
+            View child=ranges.getChildAt(i);
+            Object tag=child.getTag();
+            if(tag instanceof Integer&&((Integer)tag)==start){
+                child.requestFocus();
+                return;
+            }
+        }
+    }
+
+    private void renderEpisodeRange(LinearLayout ranges,LinearLayout host,HorizontalScrollView episodeScroll,Anime anime,List<Anime> eps,int start,int focusIndex){
+        int safeStart=Math.max(0,Math.min(start,Math.max(0,eps.size()-1)));
+        if(eps.size()>EPISODE_RANGE)safeStart=(safeStart/EPISODE_RANGE)*EPISODE_RANGE;else safeStart=0;
+        int end=Math.min(safeStart+EPISODE_RANGE,eps.size());
+        host.removeAllViews();
+
+        for(int c=0;c<ranges.getChildCount();c++){
+            View child=ranges.getChildAt(c);Object tag=child.getTag();
+            if(child instanceof TextView&&tag instanceof Integer){
+                boolean selected=((Integer)tag)==safeStart;
+                child.setBackground(selected?outline(0xD92A0710,RED,9,2):bg(0xFF202026,9));
+            }
+        }
+
+        for(int i=safeStart;i<end;i++){
             final int index=i;Anime current=eps.get(i);WatchHistory.Entry watched=WatchHistory.find(this,historyId(anime),current.description);
             FrameLayout tile=new FrameLayout(this);tile.setFocusable(true);tile.setBackground(bg(0xFF15151A,9));
             LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(dp(205),dp(112));lp.rightMargin=dp(12);host.addView(tile,lp);
             ImageView thumb=new ImageView(this);thumb.setScaleType(ImageView.ScaleType.CENTER_CROP);tile.addView(thumb,new FrameLayout.LayoutParams(-1,-1));Net.image(current.poster.isEmpty()?anime.poster:current.poster,thumb);
             View shade=new View(this);shade.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,new int[]{0x10000000,0x50000000,0xEE08080A}));tile.addView(shade,new FrameLayout.LayoutParams(-1,-1));
             LinearLayout caption=column();pad(caption,12,0,10,9);FrameLayout.LayoutParams cp=new FrameLayout.LayoutParams(-1,-2,Gravity.BOTTOM);tile.addView(caption,cp);
-            TextView title=label((index+1)+". "+current.description,13,WHITE,true);title.setSingleLine(true);title.setEllipsize(android.text.TextUtils.TruncateAt.END);caption.addView(title);
+            int number=episodeDisplayNumber(eps,index);
+            TextView title=label("Episódio "+number,13,WHITE,true);title.setSingleLine(true);caption.addView(title);
             String state=watched==null?"Não assistido":watched.watched()?"✓ Assistido":"Continuar em "+formatTime(watched.position);
             caption.addView(label(state,11,watched!=null&&watched.watched()?0xFF66D38A:MUTED,false));
             View focus=new View(this);focus.setBackground(outline(Color.TRANSPARENT,RED,9,2));focus.setVisibility(View.GONE);tile.addView(focus,new FrameLayout.LayoutParams(-1,-1));
             tile.setOnFocusChangeListener((v,foc)->{focus.setVisibility(foc?View.VISIBLE:View.GONE);v.setScaleX(foc?1.025f:1f);v.setScaleY(foc?1.025f:1f);});
             tile.setOnClickListener(v->{WatchHistory.Entry progress=WatchHistory.find(this,historyId(anime),current.description);String nextUrl=index+1<eps.size()?eps.get(index+1).playUrl:"";String nextLabel=index+1<eps.size()?eps.get(index+1).description:"";play(anime,current.description,current.playUrl,nextUrl,nextLabel,progress==null||progress.watched()?0:progress.position);});
+            if(index==focusIndex)tile.post(tile::requestFocus);
         }
-        if(end<eps.size()){TextView more=button("Mais episódios  ›",()->{host.removeViewAt(host.getChildCount()-1);appendEpisodes(host,anime,eps,end);});host.addView(more,new LinearLayout.LayoutParams(dp(180),dp(112)));}
+        episodeScroll.post(()->episodeScroll.scrollTo(0,0));
     }
     private void playFirstEpisode(Anime anime){
         Catalog.episodes(anime,(episodes,error)->{if(episodes.isEmpty()){Toast.makeText(this,"Nenhum episódio disponível nesta versão.",Toast.LENGTH_LONG).show();return;}Anime ep=episodes.get(0);play(anime,ep.description,ep.playUrl,episodes.size()>1?episodes.get(1).playUrl:"",episodes.size()>1?episodes.get(1).description:"",0);});
