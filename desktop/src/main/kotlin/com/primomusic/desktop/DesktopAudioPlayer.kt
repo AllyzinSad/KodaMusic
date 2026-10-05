@@ -14,6 +14,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.cancel
 import java.io.File
 import java.io.FileOutputStream
+import java.net.UnixDomainSocketAddress
+import java.nio.ByteBuffer
+import java.nio.channels.SocketChannel
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
@@ -32,7 +35,7 @@ enum class AudioQuality(
 }
 
 /**
- * Windows player architecture:
+ * Desktop player architecture:
  *
  * videoId
  *   -> YouTube Innertube direct player API (primary)
@@ -1078,10 +1081,12 @@ class DesktopAudioPlayer(
             launchSerial
                 .incrementAndGet()
 
-        val pipe =
-            "\\\\.\\pipe\\primo-music-" +
-                "${ProcessHandle.current().pid()}-" +
-                serial
+        val pipe = if (RuntimeTools.isLinux) {
+            File(System.getProperty("java.io.tmpdir"),
+                "koda-${ProcessHandle.current().pid()}-$serial.sock").absolutePath
+        } else {
+            "\\\\.\\pipe\\primo-music-${ProcessHandle.current().pid()}-$serial"
+        }
 
         val args =
             mutableListOf(
@@ -1532,6 +1537,9 @@ class DesktopAudioPlayer(
         }
 
         process = null
+        if (RuntimeTools.isLinux) {
+            currentPipePath?.let { runCatching { File(it).delete() } }
+        }
         currentPipePath = null
     }
 
@@ -1551,22 +1559,18 @@ class DesktopAudioPlayer(
             6
         ) { attempt ->
             try {
-                FileOutputStream(
-                    pipe
-                )
-                    .use { output ->
-                        output.write(
-                            (
-                                jsonCommand +
-                                    "\n"
-                                )
-                                .toByteArray(
-                                    StandardCharsets.UTF_8
-                                )
-                        )
-
+                val bytes = (jsonCommand + "\n").toByteArray(StandardCharsets.UTF_8)
+                if (RuntimeTools.isLinux) {
+                    SocketChannel.open(UnixDomainSocketAddress.of(pipe)).use { channel ->
+                        val buffer = ByteBuffer.wrap(bytes)
+                        while (buffer.hasRemaining()) channel.write(buffer)
+                    }
+                } else {
+                    FileOutputStream(pipe).use { output ->
+                        output.write(bytes)
                         output.flush()
                     }
+                }
 
                 return true
             } catch (_: Throwable) {
@@ -1677,6 +1681,8 @@ class DesktopAudioPlayer(
  */
 private object RuntimeTools {
 
+    val isLinux = System.getProperty("os.name").startsWith("Linux", ignoreCase = true)
+
     const val USER_AGENT =
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
             "AppleWebKit/537.36 " +
@@ -1684,6 +1690,13 @@ private object RuntimeTools {
             "Safari/537.36"
 
     fun ensureMpv(): File {
+        if (isLinux) {
+            val candidates = listOfNotNull(
+                System.getenv("KODA_MPV_PATH")?.takeIf { it.isNotBlank() }?.let(::File)
+            ) + (System.getenv("PATH") ?: "").split(File.pathSeparator).map { File(it, "mpv") }
+            return candidates.firstOrNull { it.isFile && it.canExecute() }
+                ?: error("mpv não encontrado. Instale com: sudo apt install mpv")
+        }
         val packagedResourcesDir =
             System.getProperty("compose.application.resources.dir")
                 ?.trim()

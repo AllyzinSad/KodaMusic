@@ -1,0 +1,62 @@
+name: Publish Koda Music Linux 3.11.0
+
+on:
+  push:
+    branches: [koda-linux-3110-preview]
+    paths:
+      - .github/workflows/publish-linux-3110.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish-koda-linux-3110
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: github.repository == 'AllyzinSad/KodaMusic'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+      - name: Build and verify Linux package
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x gradlew
+          ./gradlew :desktop:linuxPortableTar --stacktrace
+          package=release/KodaMusic-3.11.0-Linux-x64.tar.gz
+          test -s "$package"
+          tar -tzf "$package" > /tmp/koda-linux-files.txt
+          grep -Eq '(^|/)bin/KodaMusic$' /tmp/koda-linux-files.txt
+          grep -Eq '(^|/)lib/app/KodaMusic.cfg$' /tmp/koda-linux-files.txt
+          grep -Eq '(^|/)lib/runtime/lib/modules$' /tmp/koda-linux-files.txt
+          (cd release && sha256sum KodaMusic-3.11.0-Linux-x64.tar.gz > KodaMusic-3.11.0-Linux-x64.sha256)
+      - name: Publish approved Linux release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if gh release view linux-v3.11.0 >/dev/null 2>&1; then
+            echo 'Release linux-v3.11.0 already exists; refusing to overwrite.'
+            exit 1
+          fi
+          cat > /tmp/koda-linux-release-notes.md <<'NOTES'
+          Koda Music 3.11.0 para Linux x64, baseado na versão desktop com a tela cheia e as letras atualizadas.
+
+          ### Instalação
+          1. Instale o mpv no sistema. No Ubuntu/Debian: `sudo apt update && sudo apt install mpv`.
+          2. Baixe e extraia `KodaMusic-3.11.0-Linux-x64.tar.gz`.
+          3. Abra `KodaMusic-3.11.0-Linux/bin/KodaMusic`. Mantenha a pasta inteira junta.
+
+          O runtime Java acompanha o pacote. A versão Linux usa `mpv` do sistema e não inclui download/offline. Distribuição Linux x64 com interface gráfica; Ubuntu 24.04 é a base de compilação. Este arquivo é um pacote portátil `.tar.gz`, não um AppImage.
+
+          Código baseado no projeto de código aberto BitChord; créditos e licença GPLv3 acompanham o repositório.
+          NOTES
+          gh release create linux-v3.11.0             release/KodaMusic-3.11.0-Linux-x64.tar.gz             release/KodaMusic-3.11.0-Linux-x64.sha256             --target "$GITHUB_SHA"             --title 'Koda Music 3.11.0 — Linux x64'             --notes-file /tmp/koda-linux-release-notes.md             --latest=false
