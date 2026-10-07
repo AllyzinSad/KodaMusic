@@ -71,7 +71,7 @@ public class MainActivity extends Activity {
     brand.addView(subtitle);
     top.addView(brand);
 
-    TextView badge=t("BETA 0.6",11,true,Color.BLACK);
+    TextView badge=t("BETA 0.7",11,true,Color.BLACK);
     badge.setGravity(Gravity.CENTER);
     badge.setPadding(dp(12),dp(7),dp(12),dp(7));
     badge.setBackground(roundBg(GOLD,GOLD,18));
@@ -135,6 +135,7 @@ public class MainActivity extends Activity {
     tools.addView(toolGridRow("Legenda dinâmica","Texto estilizado"),lp(8));
     tools.addView(toolGridRow("SFX & música","Fade de áudio"),lp(8));
     tools.addView(toolGridRow("PNG & overlays","Fontes"),lp(8));
+    tools.addView(toolGridRow("Scene Engine & tracks","Modelo preparado p/ keyframes"),lp(8));
 
     Button fontsToggle=btn("Ver pack de fontes",false);
     TextView fonts=t(
@@ -220,7 +221,7 @@ public class MainActivity extends Activity {
     r.addView(maintenance);
 
     TextView foot=t(
-      "Koda Cut Beta 0.6 Studio UI • motor local de edição por KodaScript",
+      "Koda Cut Beta 0.7 Scene Engine • arquitetura de tracks inspirada em editores NLE modernos",
       11,false,Color.rgb(110,110,110)
     );
     foot.setGravity(Gravity.CENTER);
@@ -401,7 +402,7 @@ public class MainActivity extends Activity {
     s.append("Use SOMENTE os IDs do MAPA DE ARQUIVOS. Não invente assets.\n");
     s.append("Quando eu disser \"pode começar a editar\", gere APENAS um KodaScript JSON em um único bloco de código.\n\n");
 
-    s.append("FORMATO KODASCRIPT ANDROID BETA 0.5:\n");
+    s.append("FORMATO KODASCRIPT ANDROID BETA 0.7:\n");
     s.append("{\n");
     s.append("  \"koda_version\": \"android-0.2\",\n");
     s.append("  \"format\": \"9:16\",\n");
@@ -531,7 +532,16 @@ public class MainActivity extends Activity {
       for(String id:v.assetRefs)m.append("• ").append(id).append("\n");
     }
 
-    m.append("\nKodaScript pronto para o motor Beta 0.5.");
+    try{
+      KodaScene scene=KodaSceneCompiler.compile(currentScript);
+      m.append("\nCena interna: ").append(KodaSceneCompiler.summary(scene)).append("\n");
+      m.append("• vídeo: ").append(scene.count(KodaScene.TrackType.VIDEO)).append("\n");
+      m.append("• texto: ").append(scene.count(KodaScene.TrackType.TEXT)).append("\n");
+      m.append("• áudio: ").append(scene.count(KodaScene.TrackType.AUDIO)).append("\n");
+      m.append("• gráficos: ").append(scene.count(KodaScene.TrackType.GRAPHIC)).append("\n");
+      m.append("• efeitos: ").append(scene.count(KodaScene.TrackType.EFFECT)).append("\n");
+    }catch(Exception ignored){}
+    m.append("\nKodaScript pronto para o motor Beta 0.7.");
 
     new AlertDialog.Builder(this)
       .setTitle("Resumo da edição")
@@ -742,7 +752,15 @@ public class MainActivity extends Activity {
 
     Validation v=validateScript(currentScript);
     if(v.ok){
-      scriptStatus.setText("KodaScript válido • "+v.events+" eventos • pronto para renderizar");
+      try{
+        KodaScene scene=KodaSceneCompiler.compile(currentScript);
+        scriptStatus.setText(
+          "KodaScript válido • "+v.events+" eventos\n"+
+          "Scene Engine: "+KodaSceneCompiler.summary(scene)
+        );
+      }catch(Exception e){
+        scriptStatus.setText("KodaScript válido • "+v.events+" eventos • Scene Engine aguardando");
+      }
       scriptStatus.setTextColor(GOLD);
       if(renderButton!=null)renderButton.setEnabled(true);
     }else{
