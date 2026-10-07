@@ -1,8 +1,8 @@
-name: Koda Cut Android Beta 0.6 Studio UI
+name: Koda Cut Android Beta 0.7 Scene Engine
 
 on:
   push:
-    branches: [koda-cut-android-beta06-studio-ui]
+    branches: [koda-cut-android-beta07-scene-engine]
   workflow_dispatch:
 
 jobs:
@@ -49,5 +49,5 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: KodaCut-Android-Beta06-StudioUI
+          name: KodaCut-Android-Beta07-SceneEngine
           path: android-kodacut-beta01/app/build/outputs/apk/debug/app-debug.apk
