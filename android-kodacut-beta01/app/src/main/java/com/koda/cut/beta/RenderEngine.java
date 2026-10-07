@@ -141,6 +141,7 @@ public class RenderEngine {
     }
 
     private RenderPlan buildPlan(String script) throws Exception {
+        KodaScene scene = KodaSceneCompiler.compile(script);
         JSONObject root = new JSONObject(script);
         JSONArray timeline = root.getJSONArray("timeline");
 
@@ -163,7 +164,7 @@ public class RenderEngine {
         }
 
         if (clipCount > 1) {
-            throw new Exception("Esta primeira versão de render aceita apenas um evento clip.");
+            throw new Exception("O Scene Engine já entende múltiplos clips, mas o renderer Beta 0.7 ainda executa um clip principal por vez.");
         }
 
         File cache = new File(context.getCacheDir(), "koda_render");
@@ -184,20 +185,9 @@ public class RenderEngine {
         final double duration = clipEnd - clipStart;
         final long durationMs = (long)(duration * 1000.0);
 
-        String format = root.optString("format", "9:16");
-        int outW = 1080;
-        int outH = 1920;
-
-        if ("16:9".equals(format)) {
-            outW = 1920;
-            outH = 1080;
-        } else if ("1:1".equals(format)) {
-            outW = 1080;
-            outH = 1080;
-        } else if ("4:5".equals(format)) {
-            outW = 1080;
-            outH = 1350;
-        }
+        String format = scene.format;
+        int outW = scene.width;
+        int outH = scene.height;
 
         boolean hasMainAudio = hasAudio(mainFile);
 
@@ -291,7 +281,7 @@ public class RenderEngine {
 
         StringBuilder filters = new StringBuilder();
 
-        String mainFit = root.optString("main_fit", "contain");
+        String mainFit = scene.mainFit;
         if ("cover".equalsIgnoreCase(mainFit)) {
             filters.append("[0:v]scale=").append(outW).append(":").append(outH)
                 .append(":force_original_aspect_ratio=increase,crop=")
