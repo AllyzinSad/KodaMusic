@@ -24,6 +24,9 @@ jobs:
           java-version: '21'
           cache: gradle
       - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+          log-accepted-android-sdk-licenses: false
       - name: Prepare Android SDK
         run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0' 'cmake;3.22.1'
       - name: Validate image resources
