@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="koda_home_subtitle">O que você quer ouvir hoje?</string>
+    <string name="koda_your_rhythm">NO SEU RITMO</string>
+    <string name="koda_music_moments">Música para cada momento.</string>
+    <string name="koda_discover_sounds">Descubra novos sons e seus favoritos.</string>
+    <string name="koda_listen_now">Ouvir agora</string>
+</resources>

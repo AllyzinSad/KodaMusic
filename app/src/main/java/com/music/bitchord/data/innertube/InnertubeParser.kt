@@ -587,12 +587,7 @@ object InnertubeParser {
         fallback: Credits = Credits(),
     ): Song? {
         if (renderer == null) return null
-        val videoId = renderer.o("playlistItemData").s("videoId")
-            ?: renderer.o("overlay")
-                .o("musicItemThumbnailOverlayRenderer").o("content")
-                .o("musicPlayButtonRenderer").o("playNavigationEndpoint")
-                .o("watchEndpoint").s("videoId")
-            ?: return null
+        val videoId = MusicItemIdentity.videoId(renderer) ?: return null
 
         val columns = renderer.a("flexColumns").orEmpty()
         val title = columns.getOrNull(0)
@@ -1241,9 +1236,9 @@ object InnertubeParser {
         // as a proper Song carry no watchEndpoint at all — just a browseId
         // to a "non-music audio track page" prefixed MPED<videoId>. That's
         // the actual video id, not a real browsable page.
-        val videoId = endpoint.o("watchEndpoint").s("videoId")
-            ?: browseId?.takeIf { it.startsWith("MPED") }?.removePrefix("MPED")
-        val resolvedBrowseId = browseId?.takeUnless { it.startsWith("MPED") }
+        val videoId = MusicItemIdentity.videoId(renderer)
+        val resolvedBrowseId = MusicItemIdentity.browseId(renderer)
+        if (videoId == null && resolvedBrowseId == null) return null
         val thumbnails = renderer.o("thumbnailRenderer").o("musicThumbnailRenderer")
             .o("thumbnail").a("thumbnails")
         val subtitle = renderer.o("subtitle").runs()

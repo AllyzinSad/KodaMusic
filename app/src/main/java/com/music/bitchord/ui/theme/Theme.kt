@@ -23,17 +23,17 @@ import com.music.bitchord.R
 val AccentRed = Color(0xFFFA2D48)
 
 private val DarkColors = darkColorScheme(
-    primary = Color(0xFF8B5CF6),
+    primary = Color(0xFFB883FF),
     onPrimary = Color.White,
-    secondary = Color(0xFFB794F6),
+    secondary = Color(0xFF9954F2),
     onSecondary = Color(0xFF120B1D),
-    background = Color(0xFF07080D),
+    background = Color(0xFF09090D),
     onBackground = Color(0xFFF8F7FC),
-    surface = Color(0xFF0D0F17),
+    surface = Color(0xFF141419),
     onSurface = Color(0xFFF8F7FC),
-    surfaceVariant = Color(0xFF171A25),
-    onSurfaceVariant = Color(0xFFA9A6B4),
-    outline = Color(0xFF303446),
+    surfaceVariant = Color(0xFF202027),
+    onSurfaceVariant = Color(0xFFA5A2AF),
+    outline = Color(0xFF303039),
 )
 
 private val LightColors = lightColorScheme(

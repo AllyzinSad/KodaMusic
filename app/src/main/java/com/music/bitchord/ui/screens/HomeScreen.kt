@@ -53,6 +53,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.LibraryMusic
 import androidx.compose.material.icons.rounded.MoreVert
@@ -116,6 +117,12 @@ fun HomeScreen(
     recentlyPlayedLoading: Boolean = false,
 ) {
     val recentsViewType by AppSettings.homeRecentsViewType.collectAsStateWithLifecycle()
+    val featuredShelf = remember(state) {
+        if (state is UiState.Success) state.data.firstOrNull { shelf ->
+            shelf.items.any { it.videoId != null }
+        } else null
+    }
+    val featured = remember(featuredShelf) { featuredShelf?.items?.firstOrNull { it.videoId != null } }
 
     PullToRefresh(
         refreshing = refreshing,
@@ -129,7 +136,9 @@ fun HomeScreen(
             contentPadding = contentPadding,
         ) {
             item {
-                KodaHomeHeader(title = title)
+                KodaHomeHeader(title = title, featured = featured, onFeaturedClick = {
+                    featured?.let { onItemClick(it, featuredShelf?.title.orEmpty()) }
+                })
             }
             if (!signedIn && onSignIn != null) {
                 item {
@@ -203,59 +212,50 @@ fun HomeScreen(
 @Composable
 private fun KodaHomeHeader(
     title: String,
+    featured: ShelfItem?,
+    onFeaturedClick: () -> Unit,
 ) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = PAGE_GUTTER, vertical = 8.dp)
-            .height(154.dp),
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.horizontalGradient(
-                        listOf(
-                            Color(0xFF151020),
-                            Color(0xFF0D0F17),
-                            MaterialTheme.colorScheme.primary.copy(alpha = 0.28f),
-                        ),
-                    ),
-                )
-                .padding(20.dp),
-        ) {
-            Column(
-                modifier = Modifier.align(Alignment.CenterStart),
-                verticalArrangement = Arrangement.spacedBy(5.dp),
-            ) {
-                Text(
-                    text = "KODA MUSIC",
-                    color = MaterialTheme.colorScheme.primary,
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Bold,
-                )
-                Text(
-                    text = title,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    style = MaterialTheme.typography.headlineLarge,
-                    fontWeight = FontWeight.ExtraBold,
-                )
-                Text(
-                    text = "Sua música, do seu jeito.",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.bodyMedium,
-                )
+    Column(Modifier.fillMaxWidth().padding(horizontal = PAGE_GUTTER, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(title, color = MaterialTheme.colorScheme.onBackground,
+                    style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.koda_home_subtitle),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
             }
-
-            Image(
-                painter = painterResource(R.drawable.koda_mark),
-                contentDescription = null,
-                modifier = Modifier
-                    .align(Alignment.CenterEnd)
-                    .size(72.dp),
-            )
+            Image(painterResource(R.drawable.koda_mark), null, Modifier.size(44.dp))
+        }
+        BoxWithConstraints(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp))
+            .background(Brush.horizontalGradient(listOf(Color(0xFF2A1748), Color(0xFF141419))))) {
+            val wide = maxWidth >= 540.dp
+            Row(Modifier.fillMaxWidth().padding(20.dp), verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(18.dp)) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(stringResource(R.string.koda_your_rhythm), color = Color(0xFFB883FF),
+                        style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                    Text(featured?.title ?: stringResource(R.string.koda_music_moments), color = Color.White,
+                        style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold,
+                        maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    Text(featured?.subtitle ?: stringResource(R.string.koda_discover_sounds),
+                        color = Color.White.copy(alpha = .7f), style = MaterialTheme.typography.bodyMedium,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    if (featured != null) {
+                        androidx.compose.material3.Button(onClick = onFeaturedClick,
+                            shape = RoundedCornerShape(24.dp),
+                            colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFFB883FF), contentColor = Color(0xFF140B24))) {
+                            Icon(Icons.Rounded.PlayArrow, null, Modifier.size(20.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text(stringResource(R.string.koda_listen_now), fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+                if (wide && featured?.thumbnailUrl != null) {
+                    AsyncImage(model = featured.thumbnailUrl.artworkAt(CARD_ART_PX), contentDescription = null,
+                        contentScale = ContentScale.Crop, modifier = Modifier.size(148.dp).clip(RoundedCornerShape(12.dp)))
+                }
+            }
         }
     }
 }
@@ -865,11 +865,12 @@ internal fun ShelfCard(
     isPinned: Boolean = false,
 ) {
     Column(
-        modifier = modifier.combinedClickable(onClick = onClick, onLongClick = onLongPress),
+        modifier = modifier.clip(RoundedCornerShape(12.dp))
+            .background(MaterialTheme.colorScheme.surface)
+            .combinedClickable(onClick = onClick, onLongClick = onLongPress).padding(10.dp),
     ) {
         when (item.browseId) {
             "local:downloads" -> {
-                val palette = remember { MeshPalette(listOf(Color(0xFF1E3C72), Color(0xFF2A5298))) }
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -877,12 +878,7 @@ internal fun ShelfCard(
                         .clip(RoundedCornerShape(12.dp)),
                     contentAlignment = Alignment.Center,
                 ) {
-                    MeshGradientBackground(
-                        palette = palette,
-                        trackKey = "local:downloads",
-                        continuous = true,
-                        blurRadius = 24.dp,
-                    )
+                    Box(Modifier.fillMaxSize().background(Brush.linearGradient(listOf(Color(0xFF562F88), Color(0xFF21152E)))))
                     Icon(
                         imageVector = BitChordIcons.Download,
                         contentDescription = null,
@@ -892,7 +888,6 @@ internal fun ShelfCard(
                 }
             }
             "local:all" -> {
-                val palette = remember { MeshPalette(listOf(Color(0xFF134E5E), Color(0xFF71B280))) }
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -900,12 +895,7 @@ internal fun ShelfCard(
                         .clip(RoundedCornerShape(12.dp)),
                     contentAlignment = Alignment.Center,
                 ) {
-                    MeshGradientBackground(
-                        palette = palette,
-                        trackKey = "local:all",
-                        continuous = true,
-                        blurRadius = 24.dp,
-                    )
+                    Box(Modifier.fillMaxSize().background(Brush.linearGradient(listOf(Color(0xFF303039), Color(0xFF141419)))))
                     Icon(
                         imageVector = Icons.Rounded.LibraryMusic,
                         contentDescription = null,

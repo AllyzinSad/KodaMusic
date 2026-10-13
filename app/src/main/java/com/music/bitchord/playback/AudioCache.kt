@@ -409,7 +409,7 @@ object AudioCache {
 
     private const val CACHE_STATE_PREFS = "audio_cache_state"
     private const val KEY_MATCHING_SCHEMA = "matching_schema"
-    private const val MATCHING_SCHEMA = 2
+    private const val MATCHING_SCHEMA = 3
     private const val ALT_SUFFIX = "#alt"
 
     /**

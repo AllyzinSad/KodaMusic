@@ -1,0 +1,68 @@
+name: Koda Android Purple
+
+on:
+  push:
+    branches: [codex/android-purple-3.11.1]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: koda-android-purple-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  android-universal:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+      - uses: android-actions/setup-android@v3
+      - name: Prepare Android SDK
+        run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0' 'cmake;3.22.1'
+      - name: Validate image resources
+        run: python3 .github/scripts/check_android_pngs.py
+      - name: Test track identity and source matching
+        run: |
+          chmod +x gradlew
+          ./gradlew -PincludeAndroid=true :app:testProdReleaseUnitTest --tests com.music.bitchord.MusicItemIdentityTest --tests com.music.bitchord.StrictTrackIdentityTest --tests com.music.bitchord.SourcesTest --console=plain --no-daemon
+      - name: Build universal release APK
+        run: ./gradlew -PincludeAndroid=true :app:assembleProdRelease --console=plain --no-daemon
+      - name: Prepare APK and source archive
+        shell: bash
+        run: |
+          mkdir -p dist signing-tools
+          APK=$(find app/build/outputs/apk/prod/release -name '*universal*.apk' -print -quit)
+          test -n "$APK"
+          cp "$APK" dist/KodaMusic-Android-3.11.1-Universal-unsigned.apk
+          git archive --format=zip --prefix=KodaMusic-Android-3.11.1/ HEAD -o dist/KodaMusic-Android-3.11.1-Source.zip
+          cp "$ANDROID_HOME/build-tools/36.0.0/lib/apksigner.jar" signing-tools/apksigner.jar
+          sha256sum dist/* > dist/SHA256SUMS.txt
+      - name: Upload APK and source
+        uses: actions/upload-artifact@v4
+        with:
+          name: KodaMusic-Android-3.11.1-Build
+          path: dist/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload signing utility
+        uses: actions/upload-artifact@v4
+        with:
+          name: KodaMusic-Signing-Utility
+          path: signing-tools/apksigner.jar
+          if-no-files-found: error
+          retention-days: 3
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: KodaMusic-Identity-Test-Reports
+          path: app/build/reports/tests/
+          if-no-files-found: ignore
+          retention-days: 7

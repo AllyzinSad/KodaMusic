@@ -164,18 +164,6 @@ object TrackMatcher {
     fun ranked(candidates: List<Song>, target: Target): List<Song> =
         candidates
             .mapNotNull { candidate -> score(candidate, target)?.let { candidate to it } }
-            // A runtime-identical cover is only a last-resort explanation for
-            // catalogues crediting the same master differently. If this search
-            // also returned anything carrying the requested artist, there is
-            // no reason to keep the different-artist rows in contention. Apart
-            // from preventing covers winning ties, this avoids opening their
-            // stream URLs while a correct lossy result waits to be returned.
-            .let { scored ->
-                val credited = scored.filter { (candidate, _) ->
-                    artistScore(target.artist, candidate.artist) != null
-                }
-                credited.ifEmpty { scored }
-            }
             .sortedByDescending { it.second }
             .map { it.first }
 
@@ -210,34 +198,10 @@ object TrackMatcher {
             // the ordinary 30-second ceiling below.
             allowVideoDrift = creditedArtist != null,
         ) ?: return null
-        val artist = creditedArtist
-            // The credits don't merely differ in spelling, they name different
-            // people — and sometimes that is because they are describing the
-            // same recording from different ends of it. Film catalogues are
-            // full of this: YouTube Music files "Jhak Maar Ke" under Pritam,
-            // who *wrote* it, while every store files it under Neeraj
-            // Shridhar, who *sang* it. Neither is wrong and nothing in either
-            // credit hints at the other, so a matcher that insists on an
-            // overlap refuses the correct track every time.
-            //
-            // What breaks the tie is length. Two recordings that share an
-            // exact title and agree on their runtime to the second are the
-            // same master; a cover, a remix or a re-recording essentially
-            // never lands there — of the four candidates for that track, the
-            // remix ran 241s and the acoustic cover 66s against the 233s being
-            // played. So an exact runtime is allowed to stand in for a shared
-            // credit, and *only* an exact one: with no runtime on either side
-            // there is nothing corroborating anything, and the strict refusal
-            // stands. The match still scores below a genuine credit match, so
-            // it never wins where a properly-credited copy exists.
-            // A music video's runtime includes visuals and therefore cannot
-            // vouch for a catalogue row credited to completely different
-            // people. This exact exception is what admitted the 3:30 Lovely
-            // track for Yo Yo Honey Singh's 3:31 "Brown Rang" video.
-            ?: CREDITS_DISAGREE.takeIf {
-                !target.isVideo && withinSeconds(candidate, target, CREDIT_OVERRIDE_SEC)
-            }
-            ?: return null
+        // A shared title and runtime cannot prove that different artists are
+        // the same recording. Refuse the alternate source and let the normal
+        // fallback resolve the originally selected track instead.
+        val artist = creditedArtist ?: return null
         val explicit = explicitScore(target.isExplicit, candidate.isExplicit) ?: return null
         return BASE + artist + duration + albumScore(target.album, candidate.albumName) + explicit +
             contextScore(wanted, got)
@@ -563,20 +527,6 @@ object TrackMatcher {
     private const val ARTIST_EXACT = 25
     private const val ARTIST_SHARED = 10
 
-    /**
-     * Carried by a match the runtime vouched for rather than the credit. A
-     * penalty, not a pass: any candidate whose credit genuinely agrees beats
-     * it by at least 25, so this only ever decides what plays when nothing
-     * properly credited exists.
-     */
-    private const val CREDITS_DISAGREE = -30
-
-    /**
-     * How exactly two runtimes must agree before that is allowed to stand in
-     * for a shared credit. To the second, near enough — this is the only
-     * evidence there is in that case, so it has to be the strong kind.
-     */
-    private const val CREDIT_OVERRIDE_SEC = 2
     private const val DURATION_TIGHT = 40
     private const val DURATION_LOOSE = 15
     private const val ALBUM_EXACT = 35

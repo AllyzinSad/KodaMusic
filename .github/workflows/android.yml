@@ -9,7 +9,7 @@ concurrency:
 jobs:
   build-dev-debug:
     timeout-minutes: 30
-    if: github.ref != 'refs/heads/main' && github.ref != 'refs/heads/koda-android-final-3110'
+    if: github.ref != 'refs/heads/main' && github.ref != 'refs/heads/koda-android-final-3110' && github.ref != 'refs/heads/codex/android-purple-3.11.1'
     runs-on: ubuntu-latest
 
     steps:

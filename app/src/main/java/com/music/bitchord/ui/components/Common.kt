@@ -125,7 +125,7 @@ val FLOATING_BAR_MAX_WIDTH = 440.dp
  * Sized so a phone-width row shows two cards whole with the edge of a third
  * showing: enough to say the row scrolls without a card being half a card.
  */
-val SHELF_CARD_WIDTH = 150.dp
+val SHELF_CARD_WIDTH = 170.dp
 
 /** A song title with the catalogue-standard outlined E for explicit audio. */
 @Composable

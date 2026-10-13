@@ -327,15 +327,10 @@ class SourcesTest {
         )
     }
 
-    /**
-     * Film catalogues credit from opposite ends: YouTube Music files this
-     * under the composer, every store under the singer, and the two credits
-     * share nothing at all. An exact runtime is what says they are the same
-     * master anyway.
-     */
+    /** Different credited artists cannot be substituted based only on length. */
     @Test
-    fun `accepts a composer credit against a singer credit on an exact runtime`() {
-        assertTrue(
+    fun `refuses a composer credit against unrelated singer credit on an exact runtime`() {
+        assertFalse(
             matches(
                 song("Jhak Maar Ke", "Neeraj Shridhar", duration = "3:53"),
                 title = "Jhak Maar Ke",
@@ -343,8 +338,6 @@ class SourcesTest {
                 durationSec = 233,
             ),
         )
-        // The remix and the acoustic cover from the same result set are the
-        // reason this is safe: neither agrees on length.
         assertFalse(
             matches(
                 song("Jhak Maar Ke", "Leo Lz Mix", duration = "4:01"),
