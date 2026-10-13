@@ -24,7 +24,7 @@ val AccentRed = Color(0xFFFA2D48)
 
 private val DarkColors = darkColorScheme(
     primary = Color(0xFFB883FF),
-    onPrimary = Color.White,
+    onPrimary = Color(0xFF140B24),
     secondary = Color(0xFF9954F2),
     onSecondary = Color(0xFF120B1D),
     background = Color(0xFF09090D),

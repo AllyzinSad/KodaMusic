@@ -33,14 +33,14 @@ class SearchPagingTest {
           }
         """.trimIndent()
         val explicitBadge = """[{"musicInlineBadgeRenderer":{"icon":{"iconType":"MUSIC_EXPLICIT_BADGE"}}}]"""
-        val json = """{"contents":[${row("explicit", explicitBadge)},${row("clean", "[]") }]}"""
+        val json = """{"contents":[${row("explicit001", explicitBadge)},${row("clean000001", "[]") }]}"""
 
         val songs = InnertubeParser.parseSearchSongs(Json.parseToJsonElement(json).jsonObject)
 
-        assertTrue(songs.first { it.videoId == "explicit" }.isExplicit == true)
+        assertTrue(songs.first { it.videoId == "explicit001" }.isExplicit == true)
         // No badge is not proof of a clean edition: several YouTube renderer
         // shapes simply omit badges altogether.
-        assertNull(songs.first { it.videoId == "clean" }.isExplicit)
+        assertNull(songs.first { it.videoId == "clean000001" }.isExplicit)
     }
 
     /**
@@ -68,7 +68,7 @@ class SearchPagingTest {
                 "contents": [
                   {
                     "musicResponsiveListItemRenderer": {
-                      "playlistItemData": { "videoId": "basti" },
+                      "playlistItemData": { "videoId": "basti000001" },
                       "flexColumns": [
                         { "musicResponsiveListItemFlexColumnRenderer": {
                           "text": { "runs": [{ "text": "Basti Ka Hasti" }] }
@@ -91,7 +91,7 @@ class SearchPagingTest {
         val artist = (page.rows.first { it is SearchResult.Browse } as SearchResult.Browse).item
         assertEquals(BrowseType.ARTIST, artist.type)
         val song = page.rows.filterIsInstance<SearchResult.Track>().single().song
-        assertEquals("basti", song.videoId)
+        assertEquals("basti000001", song.videoId)
         assertEquals("MC STAN", song.artist)
         assertEquals("UCXPnAUkxJtng8M_5yWuSTjw", song.artistId)
         // The card names who, never off which release — see [cardShelfCredit].
@@ -121,11 +121,11 @@ class SearchPagingTest {
                   } } },
                   { "text": " • " }, { "text": "4:24" }
                 ] },
-                "onTap": { "watchEndpoint": { "videoId": "shape" } },
+                "onTap": { "watchEndpoint": { "videoId": "shape000001" } },
                 "contents": [
                   {
                     "musicResponsiveListItemRenderer": {
-                      "playlistItemData": { "videoId": "cover" },
+                      "playlistItemData": { "videoId": "cover000001" },
                       "flexColumns": [
                         { "musicResponsiveListItemFlexColumnRenderer": {
                           "text": { "runs": [{ "text": "Shape of you (Classical Dance)" }] }
@@ -149,9 +149,9 @@ class SearchPagingTest {
 
         val songs = page.rows.filterIsInstance<SearchResult.Track>().map { it.song } +
             page.rows.filterIsInstance<SearchResult.TopTrack>().map { it.song }
-        assertEquals("Ed Sheeran", songs.first { it.videoId == "shape" }.artist)
-        assertEquals("Pratibimb Productions", songs.first { it.videoId == "cover" }.artist)
-        assertNull(songs.first { it.videoId == "cover" }.artistId)
+        assertEquals("Ed Sheeran", songs.first { it.videoId == "shape000001" }.artist)
+        assertEquals("Pratibimb Productions", songs.first { it.videoId == "cover000001" }.artist)
+        assertNull(songs.first { it.videoId == "cover000001" }.artistId)
     }
 
     @Test
@@ -271,7 +271,7 @@ class SearchPagingTest {
               "contents": [
                 {
                   "musicResponsiveListItemRenderer": {
-                    "playlistItemData": { "videoId": "song-2" },
+                    "playlistItemData": { "videoId": "song_000002" },
                     "flexColumns": [
                       {
                         "musicResponsiveListItemFlexColumnRenderer": {
@@ -298,7 +298,7 @@ class SearchPagingTest {
         val page = InnertubeParser.parsePlaylistShelf(Json.parseToJsonElement(json).jsonObject)
 
         requireNotNull(page)
-        assertEquals(listOf("song-2"), page.songs.map { it.videoId })
+        assertEquals(listOf("song_000002"), page.songs.map { it.videoId })
         assertEquals(emptyList<String>(), page.suggested.map { it.videoId })
         assertEquals("PLAYLIST_MORE", page.continuation)
     }

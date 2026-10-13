@@ -34,7 +34,7 @@ jobs:
       - name: Test track identity and source matching
         run: |
           chmod +x gradlew
-          ./gradlew -PincludeAndroid=true :app:testProdReleaseUnitTest --tests com.music.bitchord.MusicItemIdentityTest --tests com.music.bitchord.StrictTrackIdentityTest --tests com.music.bitchord.SourcesTest --console=plain --no-daemon
+          ./gradlew -PincludeAndroid=true :app:testProdReleaseUnitTest --tests com.music.bitchord.MusicItemIdentityTest --tests com.music.bitchord.StrictTrackIdentityTest --tests com.music.bitchord.SourcesTest --tests com.music.bitchord.SearchPagingTest --tests com.music.bitchord.PlaylistOwnershipTest --tests com.music.bitchord.AccountChannelTest --console=plain --no-daemon
       - name: Build universal release APK
         run: ./gradlew -PincludeAndroid=true :app:assembleProdRelease --console=plain --no-daemon
       - name: Prepare APK and source archive
