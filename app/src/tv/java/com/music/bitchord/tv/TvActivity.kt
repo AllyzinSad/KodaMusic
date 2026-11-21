@@ -181,16 +181,23 @@ private fun TvApp(model: MainViewModel) {
         Box(Modifier.fillMaxSize().background(canvas)) {
         Row(Modifier.fillMaxSize()) {
             Column(
-                Modifier.width(68.dp).fillMaxHeight()
+                Modifier.width(164.dp).fillMaxHeight()
                     .background(Color(0xFF0D0919)).padding(horizontal = 9.dp, vertical = 22.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                androidx.compose.foundation.Image(painterResource(R.drawable.koda_mark), "Koda Music", Modifier.size(46.dp))
+                KodaBrand()
                 Spacer(Modifier.height(18.dp))
-                listOf("Início" to Icons.Rounded.Home, "Explorar" to Icons.Rounded.Explore,
-                    "Buscar" to Icons.Rounded.Search, "Biblioteca" to Icons.Rounded.LibraryMusic).forEach { (label, symbol) ->
-                    TvIconButton(symbol, label, selected = page == label, size = 48.dp) { page = label }
+                listOf("Início" to Icons.Rounded.Home, "Buscar" to Icons.Rounded.Search,
+                    "Explorar" to Icons.Rounded.Explore, "Biblioteca" to Icons.Rounded.LibraryMusic).forEach { (label, symbol) ->
+                    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterStart) {
+                        FocusTile(selected = page == label, onClick = { page = label }, modifier = Modifier.fillMaxWidth()) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Icon(symbol, null, tint = Color.White, modifier = Modifier.size(20.dp))
+                                Text(label, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                            }
+                        }
+                    }
                 }
             }
             Column(Modifier.weight(1f).fillMaxHeight().padding(start = 22.dp, end = 22.dp, top = 0.dp,
@@ -321,6 +328,14 @@ private fun TvApp(model: MainViewModel) {
 }
 
 @Composable
+private fun KodaBrand() {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        androidx.compose.foundation.Image(painterResource(R.drawable.koda_mark), null, Modifier.size(34.dp))
+        Text("Koda Music", color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+    }
+}
+
+@Composable
 private fun FullPlayer(
     model: MainViewModel,
     song: Song,
@@ -341,15 +356,15 @@ private fun FullPlayer(
     val visible = lyrics.orEmpty().filter { !it.isGap }
     val current = visible.indexOfLast { it.timeMs <= positionMs }.coerceAtLeast(0)
     BoxWithConstraints(Modifier.fillMaxSize().background(palette.background)) {
-        val artSize = (maxHeight * .31f).coerceIn(100.dp, 260.dp)
-        val artColumnWidth = (maxWidth * .28f).coerceAtLeast(artSize)
+        val artSize = (maxHeight * .43f).coerceIn(100.dp, 260.dp)
+        val artColumnWidth = (maxWidth * .35f).coerceAtLeast(artSize)
         AsyncImage(song.artworkAt(360), null, Modifier.fillMaxSize(),
             contentScale = ContentScale.Crop, alpha = .25f)
         Box(Modifier.fillMaxSize().background(Brush.horizontalGradient(listOf(
             Color(0xD9080610), Color(0xC7080610), Color(0xE6080610)))))
         Column(Modifier.fillMaxSize().padding(horizontal = 30.dp, vertical = 18.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                androidx.compose.foundation.Image(painterResource(R.drawable.koda_mark), "Koda Music", Modifier.size(36.dp))
+                KodaBrand()
                 Spacer(Modifier.weight(1f))
                 TvIconButton(Icons.Rounded.ArrowBack, "Voltar", onClick = onBack)
             }
@@ -370,15 +385,17 @@ private fun FullPlayer(
                         Text(if (checked) "Letras indisponíveis para esta música" else "Buscando letras…",
                             color = Color(0xFFD3C4DA), fontSize = 22.sp)
                     } else {
-                        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                            for (offset in -2..2) {
+                        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text("Letra sincronizada", color = Color(0xFFC993FF),
+                                fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                            for (offset in -1..2) {
                                 val line = visible.getOrNull(current + offset)
                                 Text(line?.text.orEmpty(),
                                     color = if (offset == 0) Color.White else Color(0xFF9E90AB),
-                                    fontSize = if (offset == 0) 26.sp else 20.sp,
+                                    fontSize = if (offset == 0) 31.sp else 21.sp,
                                     fontWeight = if (offset == 0) FontWeight.Bold else FontWeight.Medium,
                                     maxLines = 2, overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.height(48.dp))
+                                    modifier = Modifier.height(if (offset == 0) 76.dp else 52.dp))
                             }
                         }
                     }
@@ -491,34 +508,49 @@ private fun GenreCard(item: MoodGenre, modifier: Modifier = Modifier, onClick: (
 
 @Composable
 private fun HeroCard(item: ShelfItem, onFocus: () -> Unit = {}, onPlay: () -> Unit) {
-    Box(Modifier.fillMaxWidth().height(190.dp).background(panel)) {
+    Box(Modifier.fillMaxWidth().height(190.dp).clip(RoundedCornerShape(16.dp)).background(panel)) {
         AsyncImage(item.thumbnailUrl, item.title, Modifier.fillMaxSize(),
             contentScale = ContentScale.Crop)
         Box(Modifier.fillMaxSize().background(Brush.horizontalGradient(listOf(
             Color(0xFF080610), Color(0xD9080610), Color(0x43080610), Color(0x12080610)))))
         Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(
             Color.Transparent, Color.Transparent, canvas))))
-        Column(Modifier.fillMaxHeight().fillMaxWidth(.56f).padding(start = 6.dp, top = 12.dp, bottom = 12.dp),
+        Column(Modifier.fillMaxHeight().fillMaxWidth(.56f).padding(start = 18.dp, top = 12.dp, bottom = 12.dp),
             verticalArrangement = Arrangement.Center) {
-            Text("KODA MUSIC", color = Color(0xFFC478FF),
-                fontSize = 11.sp, fontWeight = FontWeight.Bold)
             Text(item.title, color = Color.White, fontSize = 38.sp, fontWeight = FontWeight.ExtraBold,
                 maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 40.sp)
             Text(item.subtitle, color = Color(0xFFE0D6E7), fontSize = 18.sp,
                 maxLines = 1, overflow = TextOverflow.Ellipsis)
             Spacer(Modifier.height(8.dp))
-            Box(Modifier.onFocusChanged { if (it.isFocused) onFocus() }) {
-                TvButton("▶  Reproduzir", onPlay)
+            var focused by remember { mutableStateOf(false) }
+            val buttonShape = RoundedCornerShape(24.dp)
+            Button(
+                onClick = onPlay,
+                modifier = Modifier.onFocusChanged {
+                    focused = it.hasFocus
+                    if (focused) onFocus()
+                }.then(if (focused) Modifier.border(3.dp, Color(0xFFC993FF), buttonShape) else Modifier),
+                shape = buttonShape,
+                colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = canvas),
+            ) {
+                Icon(Icons.Rounded.PlayArrow, null)
+                Spacer(Modifier.width(6.dp))
+                Text("Reproduzir", fontWeight = FontWeight.Bold)
             }
         }
     }
 }
 
 @Composable
-private fun FocusTile(selected: Boolean = false, onClick: () -> Unit, content: @Composable () -> Unit) {
+private fun FocusTile(
+    selected: Boolean = false,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
     var focused by remember { mutableStateOf(false) }
     val shape = RoundedCornerShape(12.dp)
-    Box(Modifier.clip(shape)
+    Box(modifier.clip(shape)
         .background(if (selected || focused) Color(0xFF53317B) else Color.Transparent)
         .border(if (focused) 2.dp else 0.dp, violet, shape)
         .onFocusChanged { focused = it.isFocused }
