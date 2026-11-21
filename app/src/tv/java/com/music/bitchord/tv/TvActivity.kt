@@ -41,7 +41,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -81,11 +80,9 @@ import com.music.bitchord.data.model.artworkAt
 import com.music.bitchord.playback.playSongs
 import com.music.bitchord.playback.rememberMediaController
 import com.music.bitchord.playback.rememberPlayerState
-import com.music.bitchord.data.innertube.StreamResolver
 import com.music.bitchord.data.settings.AppSettings
 import com.music.bitchord.ui.MainViewModel
 import com.music.bitchord.ui.theme.rememberArtworkPalette
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 
 private val canvas = Color(0xFF080610)
@@ -129,27 +126,56 @@ private fun TvApp(model: MainViewModel) {
     val results by model.results.collectAsStateWithLifecycle()
     val explore by model.explore.collectAsStateWithLifecycle()
     val moodShelves by model.moodGenreShelves.collectAsStateWithLifecycle()
-    val scope = rememberCoroutineScope()
     var page by remember { mutableStateOf("Início") }
     var fullPlayer by remember { mutableStateOf(false) }
     var search by remember { mutableStateOf("") }
     var selectedMood by remember { mutableStateOf<MoodGenre?>(null) }
     LaunchedEffect(page) { if (page == "Explorar" && explore !is UiState.Success) model.loadExplore() }
-    val goPlay: (Song) -> Unit = { song -> controller?.let { scope.launch { it.playSongs(listOf(song), 0) } } }
-    // Resolve the highlighted track while the viewer is deciding what to play.
-    // The resolver keeps a short-lived URL cache, so the play tap can skip that network walk.
-    var focusedVideoId by remember { mutableStateOf<String?>(null) }
-    LaunchedEffect(focusedVideoId) {
-        val id = focusedVideoId ?: return@LaunchedEffect
-        delay(350)
-        runCatching { StreamResolver.resolve(id) }
+    var pendingSongs by remember { mutableStateOf<List<Song>?>(null) }
+    var playbackMessage by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(pendingSongs, controller) {
+        val songs = pendingSongs ?: return@LaunchedEffect
+        if (controller == null) {
+            playbackMessage = "Conectando ao player…"
+            delay(8_000)
+            playbackMessage = "Não foi possível conectar ao player. Tente novamente."
+        } else {
+            playbackMessage = "Carregando música…"
+            try {
+                controller.playSongs(songs, 0)
+                delay(15_000)
+                playbackMessage = if (controller.isPlaying) null else "A reprodução não iniciou. Tente outra faixa."
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                android.util.Log.w("KodaTV", "Could not start playback", error)
+                playbackMessage = "Não foi possível iniciar a reprodução. Tente novamente."
+            }
+        }
+        pendingSongs = null
     }
+    LaunchedEffect(player.isPlaying, player.error, player.song?.videoId) {
+        when {
+            player.error != null -> {
+                pendingSongs = null
+                playbackMessage = "Não foi possível tocar esta faixa (${player.error})."
+            }
+            player.isPlaying && pendingSongs?.firstOrNull()?.videoId == player.song?.videoId -> {
+                pendingSongs = null
+                playbackMessage = null
+            }
+        }
+    }
+    val goPlay: (Song) -> Unit = { song -> pendingSongs = listOf(song) }
     val goPlayItem: (ShelfItem) -> Unit = { item ->
         when {
             item.videoId != null -> goPlay(Song(item.videoId, item.title, item.subtitle, item.thumbnailUrl))
             item.browseId != null -> model.collectSongs(item.browseId, item.thumbnailUrl) { result ->
-                result.onSuccess { songs ->
-                    if (songs.isNotEmpty()) controller?.let { scope.launch { it.playSongs(songs, 0) } }
+                val songs = result.getOrNull()
+                if (songs.isNullOrEmpty()) {
+                    playbackMessage = "Não foi possível carregar as faixas deste álbum."
+                } else {
+                    pendingSongs = songs
                 }
             }
         }
@@ -289,7 +315,7 @@ private fun TvApp(model: MainViewModel) {
                                     val featured = state.data.asSequence().flatMap { it.items.asSequence() }
                                         .firstOrNull { it.videoId != null && !it.thumbnailUrl.isNullOrBlank() }
                                     if (featured != null) item {
-                                        HeroCard(featured, onFocus = { focusedVideoId = featured.videoId }) {
+                                        HeroCard(featured) {
                                             goPlayItem(featured)
                                         }
                                     }
@@ -301,7 +327,7 @@ private fun TvApp(model: MainViewModel) {
                                         Spacer(Modifier.height(8.dp))
                                         LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                                             items(cards) { item ->
-                                                CoverCard(item, onFocus = { focusedVideoId = item.videoId }) { goPlayItem(item) }
+                                                CoverCard(item) { goPlayItem(item) }
                                             }
                                         }
                                     }
@@ -314,6 +340,12 @@ private fun TvApp(model: MainViewModel) {
                     }
                 }
             }
+        }
+        playbackMessage?.let { message ->
+            Text(message, color = Color.White, fontSize = 14.sp,
+                modifier = Modifier.align(Alignment.BottomCenter)
+                    .padding(bottom = if (player.song != null) 62.dp else 10.dp)
+                    .background(panel, RoundedCornerShape(12.dp)).padding(horizontal = 16.dp, vertical = 8.dp))
         }
         player.song?.let { song ->
             TvMiniPlayer(song, player.position.positionMs, player.durationMs, player.isPlaying,
@@ -507,9 +539,9 @@ private fun GenreCard(item: MoodGenre, modifier: Modifier = Modifier, onClick: (
 }
 
 @Composable
-private fun HeroCard(item: ShelfItem, onFocus: () -> Unit = {}, onPlay: () -> Unit) {
-    Box(Modifier.fillMaxWidth().height(190.dp).clip(RoundedCornerShape(16.dp)).background(panel)) {
-        AsyncImage(item.thumbnailUrl, item.title, Modifier.fillMaxSize(),
+private fun HeroCard(item: ShelfItem, onPlay: () -> Unit) {
+    Box(Modifier.fillMaxWidth().height(166.dp).clip(RoundedCornerShape(16.dp)).background(panel)) {
+        AsyncImage(item.thumbnailUrl, item.title, Modifier.align(Alignment.CenterEnd).fillMaxHeight().fillMaxWidth(.62f),
             contentScale = ContentScale.Crop)
         Box(Modifier.fillMaxSize().background(Brush.horizontalGradient(listOf(
             Color(0xFF080610), Color(0xD9080610), Color(0x43080610), Color(0x12080610)))))
@@ -517,8 +549,8 @@ private fun HeroCard(item: ShelfItem, onFocus: () -> Unit = {}, onPlay: () -> Un
             Color.Transparent, Color.Transparent, canvas))))
         Column(Modifier.fillMaxHeight().fillMaxWidth(.56f).padding(start = 18.dp, top = 12.dp, bottom = 12.dp),
             verticalArrangement = Arrangement.Center) {
-            Text(item.title, color = Color.White, fontSize = 38.sp, fontWeight = FontWeight.ExtraBold,
-                maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 40.sp)
+            Text(item.title, color = Color.White, fontSize = 32.sp, fontWeight = FontWeight.ExtraBold,
+                maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 34.sp)
             Text(item.subtitle, color = Color(0xFFE0D6E7), fontSize = 18.sp,
                 maxLines = 1, overflow = TextOverflow.Ellipsis)
             Spacer(Modifier.height(8.dp))
@@ -528,7 +560,6 @@ private fun HeroCard(item: ShelfItem, onFocus: () -> Unit = {}, onPlay: () -> Un
                 onClick = onPlay,
                 modifier = Modifier.onFocusChanged {
                     focused = it.hasFocus
-                    if (focused) onFocus()
                 }.then(if (focused) Modifier.border(3.dp, Color(0xFFC993FF), buttonShape) else Modifier),
                 shape = buttonShape,
                 colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = canvas),
@@ -552,19 +583,19 @@ private fun FocusTile(
     val shape = RoundedCornerShape(12.dp)
     Box(modifier.clip(shape)
         .background(if (selected || focused) Color(0xFF53317B) else Color.Transparent)
-        .border(if (focused) 2.dp else 0.dp, violet, shape)
+        .then(if (focused) Modifier.border(2.dp, Color(0xFFC993FF), shape) else Modifier)
         .onFocusChanged { focused = it.isFocused }
         .clickable(onClick = onClick).padding(horizontal = 15.dp, vertical = 12.dp)) { content() }
 }
 
 @Composable
-private fun CoverCard(item: ShelfItem, onFocus: () -> Unit = {}, onClick: () -> Unit) {
+private fun CoverCard(item: ShelfItem, onClick: () -> Unit) {
     var focused by remember { mutableStateOf(false) }
     val shape = RoundedCornerShape(14.dp)
-    Column(Modifier.width(132.dp).onFocusChanged { focused = it.isFocused; if (it.isFocused) onFocus() }
+    Column(Modifier.width(110.dp).onFocusChanged { focused = it.isFocused }
         .clip(shape).then(if (focused) Modifier.border(2.dp, violet, shape) else Modifier)
         .clickable(onClick = onClick).padding(2.dp)) {
-        Box(Modifier.size(128.dp).clip(RoundedCornerShape(11.dp)).background(panel)) {
+        Box(Modifier.fillMaxWidth().height(82.dp).clip(RoundedCornerShape(11.dp)).background(panel)) {
             AsyncImage(item.thumbnailUrl, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
         }
         Text(item.title, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 1,
