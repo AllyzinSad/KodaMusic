@@ -107,6 +107,12 @@ android {
             dimension = "env"
             // Matches defaultConfig — this is the package already shipped/installed.
         }
+        create("tv") {
+            dimension = "env"
+            applicationId = "com.kodamusic.tv"
+            versionNameSuffix = "-tv-preview"
+            resValue("string", "app_name", "Koda Music TV")
+        }
     }
 
     signingConfigs {
