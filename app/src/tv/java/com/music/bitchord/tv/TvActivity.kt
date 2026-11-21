@@ -88,6 +88,8 @@ import kotlinx.coroutines.delay
 private val canvas = Color(0xFF080610)
 private val panel = Color(0xFF181124)
 private val violet = Color(0xFF9635F5)
+private val focusViolet = Color(0xFFD8AEFF)
+private val secondaryText = Color(0xFFBEB0CC)
 
 class TvActivity : ComponentActivity() {
     private val model: MainViewModel by viewModels()
@@ -204,11 +206,13 @@ private fun TvApp(model: MainViewModel) {
                 onNext = { controller?.seekToNextMediaItem() })
             return@MaterialTheme
         }
-        Box(Modifier.fillMaxSize().background(canvas)) {
+        Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0xFF21132F), canvas, canvas)))) {
         Row(Modifier.fillMaxSize()) {
             Column(
-                Modifier.width(164.dp).fillMaxHeight()
-                    .background(Color(0xFF0D0919)).padding(horizontal = 9.dp, vertical = 22.dp),
+                Modifier.width(150.dp).fillMaxHeight()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(Brush.verticalGradient(listOf(Color(0xFF2B153C), Color(0xFF100A1A))))
+                    .padding(horizontal = 10.dp, vertical = 22.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
@@ -391,9 +395,9 @@ private fun FullPlayer(
         val artSize = (maxHeight * .43f).coerceIn(100.dp, 260.dp)
         val artColumnWidth = (maxWidth * .35f).coerceAtLeast(artSize)
         AsyncImage(song.artworkAt(360), null, Modifier.fillMaxSize(),
-            contentScale = ContentScale.Crop, alpha = .25f)
+            contentScale = ContentScale.Crop, alpha = .38f)
         Box(Modifier.fillMaxSize().background(Brush.horizontalGradient(listOf(
-            Color(0xD9080610), Color(0xC7080610), Color(0xE6080610)))))
+            Color(0xC0080610), Color(0xDC1B102E), Color(0xED080610)))))
         Column(Modifier.fillMaxSize().padding(horizontal = 30.dp, vertical = 18.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 KodaBrand()
@@ -422,22 +426,30 @@ private fun FullPlayer(
                                 fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                             for (offset in -1..2) {
                                 val line = visible.getOrNull(current + offset)
-                                Text(line?.text.orEmpty(),
+                                Row(Modifier.fillMaxWidth().height(if (offset == 0) 74.dp else 45.dp),
+                                    verticalAlignment = Alignment.CenterVertically) {
+                                    Box(Modifier.width(5.dp).height(30.dp).clip(RoundedCornerShape(3.dp))
+                                        .background(if (offset == 0 && line != null) focusViolet else Color.Transparent))
+                                    Spacer(Modifier.width(12.dp))
+                                    Text(line?.text.orEmpty(),
                                     color = if (offset == 0) Color.White else Color(0xFF9E90AB),
                                     fontSize = if (offset == 0) 31.sp else 21.sp,
                                     fontWeight = if (offset == 0) FontWeight.Bold else FontWeight.Medium,
                                     maxLines = 2, overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.height(if (offset == 0) 76.dp else 52.dp))
+                                    lineHeight = if (offset == 0) 35.sp else 23.sp)
+                                }
                             }
                         }
                     }
                 }
             }
             Spacer(Modifier.height(10.dp))
-            ProgressTrack(positionMs, durationMs, Modifier.fillMaxWidth())
-            Row(Modifier.fillMaxWidth().padding(top = 5.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(formatTime(positionMs), color = Color(0xFFD5C8DD), fontSize = 12.sp)
-                Text(formatTime(durationMs), color = Color(0xFFD5C8DD), fontSize = 12.sp)
+            Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp))
+                .background(Color(0xE9110B1B)).padding(horizontal = 20.dp, vertical = 8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(formatTime(positionMs), color = secondaryText, fontSize = 13.sp)
+                ProgressTrack(positionMs, durationMs, Modifier.weight(1f))
+                Text(formatTime(durationMs), color = secondaryText, fontSize = 13.sp)
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically) {
@@ -447,6 +459,7 @@ private fun FullPlayer(
                     if (playing) "Pausar" else "Reproduzir", selected = true, size = 52.dp, onClick = onToggle)
                 Spacer(Modifier.width(15.dp))
                 TvIconButton(Icons.Rounded.SkipNext, "Próxima", onClick = onNext)
+            }
             }
         }
     }
@@ -544,10 +557,10 @@ private fun HeroCard(item: ShelfItem, onPlay: () -> Unit) {
         AsyncImage(item.thumbnailUrl, item.title, Modifier.align(Alignment.CenterEnd).fillMaxHeight().fillMaxWidth(.62f),
             contentScale = ContentScale.Crop)
         Box(Modifier.fillMaxSize().background(Brush.horizontalGradient(listOf(
-            Color(0xFF080610), Color(0xD9080610), Color(0x43080610), Color(0x12080610)))))
+            Color(0xFF231232), Color(0xF01A1026), Color(0x55130D20), Color(0x08130D20)))))
         Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(
             Color.Transparent, Color.Transparent, canvas))))
-        Column(Modifier.fillMaxHeight().fillMaxWidth(.56f).padding(start = 18.dp, top = 12.dp, bottom = 12.dp),
+        Column(Modifier.fillMaxHeight().fillMaxWidth(.56f).padding(start = 24.dp, top = 12.dp, bottom = 12.dp),
             verticalArrangement = Arrangement.Center) {
             Text(item.title, color = Color.White, fontSize = 32.sp, fontWeight = FontWeight.ExtraBold,
                 maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 34.sp)
@@ -593,7 +606,7 @@ private fun CoverCard(item: ShelfItem, onClick: () -> Unit) {
     var focused by remember { mutableStateOf(false) }
     val shape = RoundedCornerShape(14.dp)
     Column(Modifier.width(110.dp).onFocusChanged { focused = it.isFocused }
-        .clip(shape).then(if (focused) Modifier.border(2.dp, violet, shape) else Modifier)
+        .clip(shape).then(if (focused) Modifier.border(2.dp, focusViolet, shape) else Modifier)
         .clickable(onClick = onClick).padding(2.dp)) {
         Box(Modifier.fillMaxWidth().height(82.dp).clip(RoundedCornerShape(11.dp)).background(panel)) {
             AsyncImage(item.thumbnailUrl, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
