@@ -36,6 +36,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -61,9 +62,11 @@ import androidx.compose.material.icons.rounded.SkipNext
 import androidx.compose.material.icons.rounded.SkipPrevious
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -100,7 +103,21 @@ class TvActivity : ComponentActivity() {
             hide(WindowInsetsCompat.Type.systemBars())
             systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         }
-        setContent { TvApp(model) }
+        setContent {
+            BoxWithConstraints(Modifier.fillMaxSize().background(canvas)) {
+                val systemDensity = LocalDensity.current
+                // Scale from the app window rather than the TV's advertised resolution.
+                val scale = minOf(maxWidth / 960.dp, maxHeight / 540.dp).coerceIn(0.6f, 2f)
+                val tvDensity = remember(systemDensity, scale) {
+                    Density(systemDensity.density * scale, systemDensity.fontScale)
+                }
+                CompositionLocalProvider(LocalDensity provides tvDensity) {
+                    Box(Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 10.dp)) {
+                        TvApp(model)
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -144,6 +161,9 @@ private fun TvApp(model: MainViewModel) {
         controller?.stop()
         controller?.clearMediaItems()
         activity?.finish()
+    }
+    BackHandler(!fullPlayer && page != "Início") {
+        page = "Início"
     }
     BackHandler(!fullPlayer && page == "Explorar" && selectedMood != null) {
         selectedMood = null
@@ -486,7 +506,6 @@ private fun HeroCard(item: ShelfItem, onFocus: () -> Unit = {}, onPlay: () -> Un
                 maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 40.sp)
             Text(item.subtitle, color = Color(0xFFE0D6E7), fontSize = 18.sp,
                 maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text("Ouça agora no Koda Music.", color = Color(0xFFBCAFCB), fontSize = 12.sp)
             Spacer(Modifier.height(8.dp))
             Box(Modifier.onFocusChanged { if (it.isFocused) onFocus() }) {
                 TvButton("▶  Reproduzir", onPlay)
